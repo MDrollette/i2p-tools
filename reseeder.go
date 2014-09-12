@@ -1,142 +1,78 @@
 package main
 
+// read in all files from netdb dir into a slice of routerinfos
+
+// for every unique requesting IP
+// look up that IP in the db
+// - if it exists, check the creation time
+// - if the creation time is within the threshold, serve up the routerinfos
+// - if the creation time is outside the threshold, or if it does not exist generate a new slice of routerinfos from the current master set
+
+// at some regular interval, update the master slice with fresh netdb routerinfos
+
+// can serve up html/ul of routerinfos
+// can serve up su3 signed file
+// https://geti2p.net/en/docs/spec/updates
+
 import (
-	"flag"
 	"fmt"
-	"github.com/braintree/manners"
 	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"html/template"
+	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
-	"os/signal"
-	"sync"
 	"time"
 )
 
-var netdbDir = flag.String("dir", "./netdb", "Location of your netdb directory")
-var bindIp = flag.String("ip", "", "Interface to bind to")
-var bindPort = flag.String("port", "3000", "Port to bind to")
+type Reseeder struct {
+	NetDBDir        string
+	nextMap         chan []string
+	RefreshInterval time.Duration
+}
 
-func main() {
-	flag.Parse()
+func (rs *Reseeder) Start(addr, port, cert, key string) {
+	log.Println("Starting reseed server on " + addr + ":" + port)
 
-	netdb := NewNetDb(*netdbDir)
-	reseeder := &Reseeder{netdb, make([]*Peer, 100)}
+	r := mux.NewRouter()
+	s := r.PathPrefix("/netdb").Subrouter()
+	s.HandleFunc("/", rs.listHandler)
+	//s.HandleFunc("/i2pseeds.su3", rs.su3Handler)
+	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, rs.routerInfoHandler)
 
-	log.Printf("Starting server on %s:%s serving netdb from %s", *bindIp, *bindPort, *netdbDir)
+	http.Handle("/", handlers.CombinedLoggingHandler(os.Stdout, proxiedHandler(r)))
 
-	server := manners.NewServer()
+	go rs.runMap()
+	rs.Refresh()
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	// sample function to update routerInfo map every minute
 	go func() {
-		<-c
-		log.Println("waiting for connections to close and exiting...")
-		server.Shutdown <- true
-		go time.AfterFunc(time.Duration(5)*time.Second, func() {
-			log.Println("Killing idle connections...")
-			os.Exit(0)
-		})
+		for {
+			time.Sleep(rs.RefreshInterval)
+			log.Println("Updating routerInfos")
+			rs.Refresh()
+		}
 	}()
 
-	err := server.ListenAndServe(*bindIp+":"+*bindPort, handlers.CombinedLoggingHandler(os.Stdout, reseeder))
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
-}
-
-type Reseeder struct {
-	NetDb *NetDb
-	Peers []*Peer
-}
-
-func (rs *Reseeder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	infos := make(chan *RouterInfo)
-
-	peer := &Peer{req.RemoteAddr, time.Now(), time.Now()}
-
-	go rs.GetForPeer(peer, infos)
-
-	for info := range infos {
-		fmt.Fprintf(w, "%s\n", info.Name)
-	}
-}
-
-func (rs *Reseeder) GetForPeer(peer *Peer, infos chan *RouterInfo) {
-	rs.NetDb.lock.RLock()
-	defer rs.NetDb.lock.RUnlock()
-
-	for _, info := range rs.NetDb.RouterInfos {
-		infos <- info
-	}
-	close(infos)
-}
-
-func NewNetDb(dir string) *NetDb {
-	if _, err := os.Stat(dir); err != nil {
-		if os.IsNotExist(err) {
-			log.Fatalf("netdb directory is not readable: %s", dir)
-		} else {
-			// other error
+	if _, err := os.Stat(cert); err == nil {
+		if _, err := os.Stat(key); err == nil {
+			err := http.ListenAndServeTLS(addr+":"+port, cert, key, nil)
+			if nil != err {
+				log.Fatalln(err)
+			}
+			return
 		}
 	}
-	netdb := &NetDb{Dir: dir, RouterInfos: make(map[string]*RouterInfo, 1000)}
-	netdb.Refresh()
 
-	return netdb
-}
-
-type NetDb struct {
-	lock        sync.RWMutex
-	RouterInfos map[string]*RouterInfo
-	Dir         string
-}
-
-func (db *NetDb) Refresh() {
-	files, err := ioutil.ReadDir(db.Dir)
+	err := http.ListenAndServe(addr+":"+port, nil)
 	if nil != err {
-		log.Fatalf("unable to read %s", db.Dir)
-	}
-	for _, file := range files {
-		db.Set(file.Name(), NewRouterInfo(db.Dir+file.Name()))
+		log.Fatalln(err)
 	}
 }
 
-func (db *NetDb) Get(key string) (*RouterInfo, bool) {
-	db.lock.RLock()
-	defer db.lock.RUnlock()
-	d, ok := db.RouterInfos[key]
-	return d, ok
-}
-
-func (db *NetDb) Set(key string, d *RouterInfo) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-	db.RouterInfos[key] = d
-}
-
-func (db *NetDb) UnSet(key string) {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-	delete(db.RouterInfos, key)
-}
-
-func NewRouterInfo(file string) *RouterInfo {
-	return &RouterInfo{file}
-}
-
-type RouterInfo struct {
-	Name string
-}
-
-type Peer struct {
-	Ip      string
-	Seen    time.Time
-	Created time.Time
-}
-
-//// stuff for reverse proxy handling
 func proxiedHandler(h http.Handler) http.Handler {
 	return remoteAddrFixup{h}
 }
@@ -150,4 +86,75 @@ func (h remoteAddrFixup) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.RemoteAddr = prior[0]
 	}
 	h.h.ServeHTTP(w, r)
+}
+
+func NewReseeder() *Reseeder {
+	return &Reseeder{nextMap: make(chan []string)}
+}
+
+func (r *Reseeder) runMap() {
+	var m []string
+	for {
+		select {
+		case m = <-r.nextMap:
+		case r.nextMap <- m:
+		}
+	}
+}
+
+func (r *Reseeder) Refresh() {
+	var m []string
+
+	src, err := ioutil.ReadDir(r.NetDBDir)
+	if nil != err {
+		log.Fatalln("error reading netdb dir", err)
+		return
+	}
+
+	// randomize the file order
+	files := make([]os.FileInfo, len(src))
+	perm := rand.Perm(len(src))
+	for i, v := range perm {
+		files[v] = src[i]
+	}
+
+	added := 0
+	for _, file := range files {
+		if !file.IsDir() && file.Name() != "." && file.Name() != ".." {
+			m = append(m, file.Name())
+			added++
+		}
+		if added >= 50 {
+			break
+		}
+	}
+
+	r.nextMap <- m
+}
+
+func (rs *Reseeder) listHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.New("foo").Parse(`<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`)
+	if err != nil {
+		panic(err)
+	}
+
+	err = tmpl.Execute(w, <-rs.nextMap)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (rs *Reseeder) su3Handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "")
+}
+
+func (rs *Reseeder) routerInfoHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	fileName := "routerInfo-" + vars["hash"] + ".dat"
+	f, err := os.Open(rs.NetDBDir + "/" + fileName)
+	if nil != err {
+		log.Fatalln("error sending file", err)
+		return
+	}
+	io.Copy(w, f)
 }
