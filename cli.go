@@ -48,11 +48,26 @@ func main() {
 					Value: 300 * time.Second,
 					Usage: "Period to refresh routerInfo lists in time duration format (200ns, 1s, 5m)",
 				},
+				cli.BoolFlag{
+					Name:  "proxy",
+					Usage: "Trust the IP supplied in the X-Forwarded-For header",
+				},
+				cli.BoolFlag{
+					Name:  "verbose",
+					Usage: "Display all access logs",
+				},
+				cli.IntFlag{
+					Name:  "rateLimit",
+					Usage: "Maximum number of requests per minute per IP",
+				},
 			},
 			Action: func(c *cli.Context) {
 				server := NewReseeder()
 				server.NetDBDir = c.String("netdb")
 				server.RefreshInterval = c.Duration("refresh")
+				server.Proxy = c.Bool("proxy")
+				server.Verbose = c.Bool("verbose")
+				server.RateLimit = c.Int("rateLimit")
 				server.Start(c.String("addr"), c.String("port"), c.String("cert"), c.String("key"))
 			},
 		},
@@ -71,7 +86,7 @@ func main() {
 				},
 				cli.DurationFlag{
 					Name:  "validFor",
-					Value: 365 * 24 * time.Hour,
+					Value: 2 * 365 * 24 * time.Hour,
 					Usage: "Duration that certificate is valid for",
 				},
 				cli.BoolFlag{

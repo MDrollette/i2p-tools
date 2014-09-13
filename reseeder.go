@@ -15,7 +15,8 @@ package main
 // https://geti2p.net/en/docs/spec/updates
 
 import (
-	"fmt"
+	"github.com/PuerkitoBio/throttled"
+	"github.com/PuerkitoBio/throttled/store"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"html/template"
@@ -27,51 +28,6 @@ import (
 	"os"
 	"time"
 )
-
-type Reseeder struct {
-	NetDBDir        string
-	nextMap         chan []string
-	RefreshInterval time.Duration
-}
-
-func (rs *Reseeder) Start(addr, port, cert, key string) {
-	log.Println("Starting reseed server on " + addr + ":" + port)
-
-	r := mux.NewRouter()
-	s := r.PathPrefix("/netdb").Subrouter()
-	s.HandleFunc("/", rs.listHandler)
-	//s.HandleFunc("/i2pseeds.su3", rs.su3Handler)
-	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, rs.routerInfoHandler)
-
-	http.Handle("/", handlers.CombinedLoggingHandler(os.Stdout, proxiedHandler(r)))
-
-	go rs.runMap()
-	rs.Refresh()
-
-	// sample function to update routerInfo map every minute
-	go func() {
-		for {
-			time.Sleep(rs.RefreshInterval)
-			log.Println("Updating routerInfos")
-			rs.Refresh()
-		}
-	}()
-
-	if _, err := os.Stat(cert); err == nil {
-		if _, err := os.Stat(key); err == nil {
-			err := http.ListenAndServeTLS(addr+":"+port, cert, key, nil)
-			if nil != err {
-				log.Fatalln(err)
-			}
-			return
-		}
-	}
-
-	err := http.ListenAndServe(addr+":"+port, nil)
-	if nil != err {
-		log.Fatalln(err)
-	}
-}
 
 func proxiedHandler(h http.Handler) http.Handler {
 	return remoteAddrFixup{h}
@@ -88,6 +44,72 @@ func (h remoteAddrFixup) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.h.ServeHTTP(w, r)
 }
 
+type Reseeder struct {
+	NetDBDir        string
+	nextMap         chan []string
+	RefreshInterval time.Duration
+	Proxy           bool
+	Verbose         bool
+	RateLimit       int
+
+	listTemplate *template.Template
+}
+
+func (rs *Reseeder) Start(addr, port, cert, key string) {
+	var err error
+
+	go rs.runMap()
+	go rs.refresher()
+
+	// parse the template for routerInfo lists
+	rs.listTemplate, err = template.New("routerinfos").Parse(`<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`)
+	if err != nil {
+		log.Fatalln("error parsing routerInfo list template", err)
+		return
+	}
+
+	r := mux.NewRouter()
+	s := r.PathPrefix("/netdb").Subrouter()
+
+	s.HandleFunc("/", rs.listHandler)
+	s.HandleFunc("/i2pseeds.su3", rs.su3Handler)
+	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, rs.routerInfoHandler)
+
+	// timeout
+	muxWithMiddlewares := http.TimeoutHandler(r, time.Second*5, "Timeout!")
+
+	if rs.Proxy {
+		muxWithMiddlewares = proxiedHandler(muxWithMiddlewares)
+	}
+
+	th := throttled.RateLimit(throttled.PerMin(rs.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(0))
+	muxWithMiddlewares = th.Throttle(muxWithMiddlewares)
+
+	if rs.Verbose {
+		muxWithMiddlewares = handlers.CombinedLoggingHandler(os.Stdout, muxWithMiddlewares)
+	}
+
+	// try to start tls server
+	if _, err = os.Stat(cert); err == nil {
+		if _, err = os.Stat(key); err == nil {
+			log.Println("Starting TLS reseed server on " + addr + ":" + port)
+			err := http.ListenAndServeTLS(addr+":"+port, cert, key, muxWithMiddlewares)
+			if nil != err {
+				log.Fatalln(err)
+			}
+
+			return
+		}
+	}
+
+	// fall back to regular http server
+	log.Println("Starting reseed server on " + addr + ":" + port)
+	err = http.ListenAndServe(addr+":"+port, muxWithMiddlewares)
+	if nil != err {
+		log.Fatalln(err)
+	}
+}
+
 func NewReseeder() *Reseeder {
 	return &Reseeder{nextMap: make(chan []string)}
 }
@@ -99,6 +121,14 @@ func (r *Reseeder) runMap() {
 		case m = <-r.nextMap:
 		case r.nextMap <- m:
 		}
+	}
+}
+
+func (r *Reseeder) refresher() {
+	for {
+		log.Println("Updating routerInfos")
+		r.Refresh()
+		time.Sleep(r.RefreshInterval)
 	}
 }
 
@@ -133,19 +163,14 @@ func (r *Reseeder) Refresh() {
 }
 
 func (rs *Reseeder) listHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.New("foo").Parse(`<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`)
+	err := rs.listTemplate.Execute(w, <-rs.nextMap)
 	if err != nil {
-		panic(err)
-	}
-
-	err = tmpl.Execute(w, <-rs.nextMap)
-	if err != nil {
-		panic(err)
+		log.Fatalln("error rending list template", err)
 	}
 }
 
 func (rs *Reseeder) su3Handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "")
+	http.NotFound(w, r)
 }
 
 func (rs *Reseeder) routerInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +178,8 @@ func (rs *Reseeder) routerInfoHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := "routerInfo-" + vars["hash"] + ".dat"
 	f, err := os.Open(rs.NetDBDir + "/" + fileName)
 	if nil != err {
-		log.Fatalln("error sending file", err)
+		http.NotFound(w, r)
+		log.Println("error sending file", err)
 		return
 	}
 	io.Copy(w, f)
