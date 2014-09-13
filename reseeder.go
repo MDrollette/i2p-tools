@@ -92,13 +92,13 @@ func Run(config *Config) {
 	listenAddress := fmt.Sprintf("%s:%s", config.Addr, config.Port)
 
 	if config.Cert != "" && config.Key != "" {
-		log.Println("Starting http reseed server on " + listenAddress)
+		log.Println("Starting https reseed server on " + listenAddress)
 		err := http.ListenAndServeTLS(listenAddress, config.Cert, config.Key, muxWithMiddlewares)
 		if nil != err {
 			log.Fatalln(err)
 		}
 	} else {
-		log.Println("Starting https reseed server on " + listenAddress)
+		log.Println("Starting http reseed server on " + listenAddress)
 		err := http.ListenAndServe(listenAddress, muxWithMiddlewares)
 		if nil != err {
 			log.Fatalln(err)
