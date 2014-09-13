@@ -16,7 +16,7 @@ func main() {
 		{
 			Name:      "serve",
 			ShortName: "s",
-			Usage:     "Start an http server for SU3 files",
+			Usage:     "Start an http(s) reseed server",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "addr",
@@ -30,12 +30,10 @@ func main() {
 				},
 				cli.StringFlag{
 					Name:  "cert",
-					Value: "cert.pem",
 					Usage: "Certificate for TLS",
 				},
 				cli.StringFlag{
 					Name:  "key",
-					Value: "key.pem",
 					Usage: "Key for TLS certificate",
 				},
 				cli.StringFlag{

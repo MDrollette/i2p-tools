@@ -73,14 +73,11 @@ func Run(config *Config) {
 	s := r.PathPrefix("/netdb").Subrouter()
 
 	s.HandleFunc("/", legacyReseeder.ListHandler)
-	s.HandleFunc("/i2pseeds.su3", su3Reseeder.Su3Handler)
 	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, legacyReseeder.RouterInfoHandler)
-
-	// timeout
-	muxWithMiddlewares := http.TimeoutHandler(r, time.Second*5, "Timeout!")
+	s.HandleFunc("/i2pseeds.su3", su3Reseeder.Su3Handler)
 
 	th := throttled.RateLimit(throttled.PerMin(config.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
-	muxWithMiddlewares = th.Throttle(muxWithMiddlewares)
+	muxWithMiddlewares := th.Throttle(r)
 
 	if config.Proxy {
 		muxWithMiddlewares = proxiedHandler(muxWithMiddlewares)
@@ -92,16 +89,14 @@ func Run(config *Config) {
 
 	listenAddress := fmt.Sprintf("%s:%s", config.Addr, config.Port)
 
-	// try to start tls server
 	if config.Cert != "" && config.Key != "" {
-		log.Println("Starting TLS reseed server on " + listenAddress)
+		log.Println("Starting http reseed server on " + listenAddress)
 		err := http.ListenAndServeTLS(listenAddress, config.Cert, config.Key, muxWithMiddlewares)
 		if nil != err {
 			log.Fatalln(err)
 		}
 	} else {
-		// fall back to regular http server
-		log.Println("Starting reseed server on " + listenAddress)
+		log.Println("Starting https reseed server on " + listenAddress)
 		err := http.ListenAndServe(listenAddress, muxWithMiddlewares)
 		if nil != err {
 			log.Fatalln(err)
