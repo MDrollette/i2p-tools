@@ -78,12 +78,12 @@ func (rs *Reseeder) Start(addr, port, cert, key string) {
 	// timeout
 	muxWithMiddlewares := http.TimeoutHandler(r, time.Second*5, "Timeout!")
 
+	th := throttled.RateLimit(throttled.PerMin(rs.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
+	muxWithMiddlewares = th.Throttle(muxWithMiddlewares)
+
 	if rs.Proxy {
 		muxWithMiddlewares = proxiedHandler(muxWithMiddlewares)
 	}
-
-	th := throttled.RateLimit(throttled.PerMin(rs.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(0))
-	muxWithMiddlewares = th.Throttle(muxWithMiddlewares)
 
 	if rs.Verbose {
 		muxWithMiddlewares = handlers.CombinedLoggingHandler(os.Stdout, muxWithMiddlewares)
