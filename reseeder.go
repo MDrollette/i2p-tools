@@ -15,6 +15,7 @@ package main
 // https://geti2p.net/en/docs/spec/updates
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/PuerkitoBio/throttled"
 	"github.com/PuerkitoBio/throttled/store"
@@ -32,7 +33,7 @@ import (
 )
 
 const (
-	LIST_TEMPLATE = `<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`
+	LIST_TEMPLATE = `<html><head><title>NetDB</title></head><body><ul>{{ range $index, $_ := . }}<li><a href="{{ $index }}">{{ $index }}</a></li>{{ end }}</ul></body></html>`
 )
 
 func proxiedHandler(h http.Handler) http.Handler {
@@ -106,7 +107,7 @@ func Run(config *Config) {
 }
 
 func NewLegacyReseeder(netdbDir string) *LegacyReseeder {
-	return &LegacyReseeder{netdbDir: netdbDir, nextMap: make(chan []string)}
+	return &LegacyReseeder{netdbDir: netdbDir, nextMap: make(chan map[string][]byte)}
 }
 
 func NewSu3Reseeder(netdbDir string) *Su3Reseeder {
@@ -126,14 +127,14 @@ func (rs *Su3Reseeder) Su3Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 type LegacyReseeder struct {
-	nextMap      chan []string
+	nextMap      chan map[string][]byte
 	netdbDir     string
 	listTemplate *template.Template
 }
 
 func (r *LegacyReseeder) Start(refreshInterval time.Duration) {
 	go func() {
-		var m []string
+		var m map[string][]byte
 		for {
 			select {
 			case m = <-r.nextMap:
@@ -145,7 +146,7 @@ func (r *LegacyReseeder) Start(refreshInterval time.Duration) {
 	go func() {
 		for {
 			log.Println("Updating routerInfos")
-			r.Refresh()
+			r.Refresh(r.netdbDir)
 			time.Sleep(refreshInterval)
 		}
 	}()
@@ -159,10 +160,10 @@ func (r *LegacyReseeder) Start(refreshInterval time.Duration) {
 	}
 }
 
-func (r *LegacyReseeder) Refresh() {
-	var m []string
+func (r *LegacyReseeder) Refresh(netdbDir string) {
+	m := make(map[string][]byte)
 
-	src, err := ioutil.ReadDir(r.netdbDir)
+	src, err := ioutil.ReadDir(netdbDir)
 	if nil != err {
 		log.Fatalln("error reading netdb dir", err)
 		return
@@ -178,7 +179,19 @@ func (r *LegacyReseeder) Refresh() {
 	added := 0
 	for _, file := range files {
 		if match, _ := regexp.MatchString("^routerInfo-[A-Za-z0-9-=~]+.dat$", file.Name()); match {
-			m = append(m, file.Name())
+			fi, err := os.Open(netdbDir + "/" + file.Name())
+			if err != nil {
+				log.Println("Error reading routerInfo file", err)
+				continue
+			}
+			fileData, err := ioutil.ReadAll(fi)
+			if nil != err {
+				log.Println("Error reading routerInfo file", err)
+				continue
+			}
+			fi.Close()
+
+			m[file.Name()] = fileData
 			added++
 		}
 		if added >= 50 {
@@ -199,11 +212,13 @@ func (lr *LegacyReseeder) ListHandler(w http.ResponseWriter, r *http.Request) {
 func (rs *LegacyReseeder) RouterInfoHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	fileName := "routerInfo-" + vars["hash"] + ".dat"
-	f, err := os.Open(rs.netdbDir + "/" + fileName)
-	if nil != err {
-		http.NotFound(w, r)
-		log.Println("error sending file", err)
+
+	m := <-rs.nextMap
+	if b, ok := m[fileName]; ok {
+		io.Copy(w, bytes.NewReader(b))
 		return
 	}
-	io.Copy(w, f)
+
+	http.NotFound(w, r)
+	log.Println("error sending file", fileName)
 }
