@@ -27,6 +27,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 )
 
@@ -73,7 +74,7 @@ func Run(config *Config) {
 	s := r.PathPrefix("/netdb").Subrouter()
 
 	s.HandleFunc("/", legacyReseeder.ListHandler)
-	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, legacyReseeder.RouterInfoHandler)
+	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9-=~]+}.dat`, legacyReseeder.RouterInfoHandler)
 	s.HandleFunc("/i2pseeds.su3", su3Reseeder.Su3Handler)
 
 	th := throttled.RateLimit(throttled.PerMin(config.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
@@ -176,7 +177,7 @@ func (r *LegacyReseeder) Refresh() {
 
 	added := 0
 	for _, file := range files {
-		if !file.IsDir() && file.Name() != "." && file.Name() != ".." {
+		if match, _ := regexp.MatchString("^routerInfo-[A-Za-z0-9-=~]+.dat$", file.Name()); match {
 			m = append(m, file.Name())
 			added++
 		}
