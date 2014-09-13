@@ -15,6 +15,7 @@ package main
 // https://geti2p.net/en/docs/spec/updates
 
 import (
+	"fmt"
 	"github.com/PuerkitoBio/throttled"
 	"github.com/PuerkitoBio/throttled/store"
 	"github.com/gorilla/handlers"
@@ -27,6 +28,10 @@ import (
 	"net/http"
 	"os"
 	"time"
+)
+
+const (
+	LIST_TEMPLATE = `<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`
 )
 
 func proxiedHandler(h http.Handler) http.Handler {
@@ -44,98 +49,124 @@ func (h remoteAddrFixup) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.h.ServeHTTP(w, r)
 }
 
-type Reseeder struct {
+type Config struct {
 	NetDBDir        string
-	nextMap         chan []string
 	RefreshInterval time.Duration
 	Proxy           bool
 	Verbose         bool
 	RateLimit       int
 
-	listTemplate *template.Template
+	Addr string
+	Port string
+	Cert string
+	Key  string
 }
 
-func (rs *Reseeder) Start(addr, port, cert, key string) {
-	var err error
+func Run(config *Config) {
+	legacyReseeder := NewLegacyReseeder(config.NetDBDir)
+	legacyReseeder.Start(config.RefreshInterval)
 
-	go rs.runMap()
-	go rs.refresher()
-
-	// parse the template for routerInfo lists
-	rs.listTemplate, err = template.New("routerinfos").Parse(`<html><head><title>NetDB</title></head><body><ul>{{ range . }}<li><a href="{{ . }}">{{ . }}</a></li>{{ end }}</ul></body></html>`)
-	if err != nil {
-		log.Fatalln("error parsing routerInfo list template", err)
-		return
-	}
+	su3Reseeder := NewSu3Reseeder(config.NetDBDir)
+	su3Reseeder.Start()
 
 	r := mux.NewRouter()
 	s := r.PathPrefix("/netdb").Subrouter()
 
-	s.HandleFunc("/", rs.listHandler)
-	s.HandleFunc("/i2pseeds.su3", rs.su3Handler)
-	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, rs.routerInfoHandler)
+	s.HandleFunc("/", legacyReseeder.ListHandler)
+	s.HandleFunc("/i2pseeds.su3", su3Reseeder.Su3Handler)
+	s.HandleFunc(`/routerInfo-{hash:[A-Za-z0-9+/\-=~]+}.dat`, legacyReseeder.RouterInfoHandler)
 
 	// timeout
 	muxWithMiddlewares := http.TimeoutHandler(r, time.Second*5, "Timeout!")
 
-	th := throttled.RateLimit(throttled.PerMin(rs.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
+	th := throttled.RateLimit(throttled.PerMin(config.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
 	muxWithMiddlewares = th.Throttle(muxWithMiddlewares)
 
-	if rs.Proxy {
+	if config.Proxy {
 		muxWithMiddlewares = proxiedHandler(muxWithMiddlewares)
 	}
 
-	if rs.Verbose {
+	if config.Verbose {
 		muxWithMiddlewares = handlers.CombinedLoggingHandler(os.Stdout, muxWithMiddlewares)
 	}
 
+	listenAddress := fmt.Sprintf("%s:%s", config.Addr, config.Port)
+
 	// try to start tls server
-	if _, err = os.Stat(cert); err == nil {
-		if _, err = os.Stat(key); err == nil {
-			log.Println("Starting TLS reseed server on " + addr + ":" + port)
-			err := http.ListenAndServeTLS(addr+":"+port, cert, key, muxWithMiddlewares)
-			if nil != err {
-				log.Fatalln(err)
+	if config.Cert != "" && config.Key != "" {
+		log.Println("Starting TLS reseed server on " + listenAddress)
+		err := http.ListenAndServeTLS(listenAddress, config.Cert, config.Key, muxWithMiddlewares)
+		if nil != err {
+			log.Fatalln(err)
+		}
+	} else {
+		// fall back to regular http server
+		log.Println("Starting reseed server on " + listenAddress)
+		err := http.ListenAndServe(listenAddress, muxWithMiddlewares)
+		if nil != err {
+			log.Fatalln(err)
+		}
+	}
+}
+
+func NewLegacyReseeder(netdbDir string) *LegacyReseeder {
+	return &LegacyReseeder{netdbDir: netdbDir, nextMap: make(chan []string)}
+}
+
+func NewSu3Reseeder(netdbDir string) *Su3Reseeder {
+	return &Su3Reseeder{netdbDir: netdbDir, nextMap: make(chan []string)}
+}
+
+type Su3Reseeder struct {
+	nextMap  chan []string
+	netdbDir string
+}
+
+func (r *Su3Reseeder) Start() {
+}
+
+func (rs *Su3Reseeder) Su3Handler(w http.ResponseWriter, r *http.Request) {
+	http.NotFound(w, r)
+}
+
+type LegacyReseeder struct {
+	nextMap      chan []string
+	netdbDir     string
+	listTemplate *template.Template
+}
+
+func (r *LegacyReseeder) Start(refreshInterval time.Duration) {
+	go func() {
+		var m []string
+		for {
+			select {
+			case m = <-r.nextMap:
+			case r.nextMap <- m:
 			}
-
-			return
 		}
-	}
+	}()
 
-	// fall back to regular http server
-	log.Println("Starting reseed server on " + addr + ":" + port)
-	err = http.ListenAndServe(addr+":"+port, muxWithMiddlewares)
-	if nil != err {
-		log.Fatalln(err)
-	}
-}
-
-func NewReseeder() *Reseeder {
-	return &Reseeder{nextMap: make(chan []string)}
-}
-
-func (r *Reseeder) runMap() {
-	var m []string
-	for {
-		select {
-		case m = <-r.nextMap:
-		case r.nextMap <- m:
+	go func() {
+		for {
+			log.Println("Updating routerInfos")
+			r.Refresh()
+			time.Sleep(refreshInterval)
 		}
+	}()
+
+	// parse the template for routerInfo lists
+	var err error
+	r.listTemplate, err = template.New("ri").Parse(LIST_TEMPLATE)
+	if err != nil {
+		log.Fatalln("error parsing routerInfo list template", err)
+		return
 	}
 }
 
-func (r *Reseeder) refresher() {
-	for {
-		log.Println("Updating routerInfos")
-		r.Refresh()
-		time.Sleep(r.RefreshInterval)
-	}
-}
-
-func (r *Reseeder) Refresh() {
+func (r *LegacyReseeder) Refresh() {
 	var m []string
 
-	src, err := ioutil.ReadDir(r.NetDBDir)
+	src, err := ioutil.ReadDir(r.netdbDir)
 	if nil != err {
 		log.Fatalln("error reading netdb dir", err)
 		return
@@ -162,21 +193,17 @@ func (r *Reseeder) Refresh() {
 	r.nextMap <- m
 }
 
-func (rs *Reseeder) listHandler(w http.ResponseWriter, r *http.Request) {
-	err := rs.listTemplate.Execute(w, <-rs.nextMap)
+func (lr *LegacyReseeder) ListHandler(w http.ResponseWriter, r *http.Request) {
+	err := lr.listTemplate.Execute(w, <-lr.nextMap)
 	if err != nil {
 		log.Fatalln("error rending list template", err)
 	}
 }
 
-func (rs *Reseeder) su3Handler(w http.ResponseWriter, r *http.Request) {
-	http.NotFound(w, r)
-}
-
-func (rs *Reseeder) routerInfoHandler(w http.ResponseWriter, r *http.Request) {
+func (rs *LegacyReseeder) RouterInfoHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	fileName := "routerInfo-" + vars["hash"] + ".dat"
-	f, err := os.Open(rs.NetDBDir + "/" + fileName)
+	f, err := os.Open(rs.netdbDir + "/" + fileName)
 	if nil != err {
 		http.NotFound(w, r)
 		log.Println("error sending file", err)

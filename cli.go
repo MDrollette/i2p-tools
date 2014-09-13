@@ -62,13 +62,17 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) {
-				server := NewReseeder()
-				server.NetDBDir = c.String("netdb")
-				server.RefreshInterval = c.Duration("refresh")
-				server.Proxy = c.Bool("proxy")
-				server.Verbose = c.Bool("verbose")
-				server.RateLimit = c.Int("rateLimit")
-				server.Start(c.String("addr"), c.String("port"), c.String("cert"), c.String("key"))
+				Run(&Config{
+					NetDBDir:        c.String("netdb"),
+					RefreshInterval: c.Duration("refresh"),
+					Proxy:           c.Bool("proxy"),
+					Verbose:         c.Bool("verbose"),
+					RateLimit:       c.Int("rateLimit"),
+					Addr:            c.String("addr"),
+					Port:            c.String("port"),
+					Cert:            c.String("cert"),
+					Key:             c.String("key"),
+				})
 			},
 		},
 		{
