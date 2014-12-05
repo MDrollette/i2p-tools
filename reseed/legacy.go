@@ -1,4 +1,4 @@
-package main
+package reseed
 
 // read in all files from netdb dir into a slice of routerinfos
 

@@ -1,4 +1,4 @@
-package main
+package reseed
 
 import (
 	"crypto/rand"
