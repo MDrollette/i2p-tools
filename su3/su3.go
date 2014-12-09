@@ -1,70 +1,194 @@
 package su3
 
-type Su3 struct {
-	// 0-5 Magic number "I2Psu3"
-	Magic [6]byte
+import (
+	"archive/zip"
+	"bytes"
+	"crypto/x509"
+	"encoding/binary"
+	"fmt"
+	"os"
+)
 
-	// 6   unused = 0
-	Unused1 [1]byte
+const (
+	MAGIC_BYTES = "I2Psu3"
 
-	// 7   su3 file format version = 0
-	Format [1]byte
+	SIGTYPE_DSA          = uint16(0)
+	SIGTYPE_ECDSA_SHA256 = uint16(1)
+	SIGTYPE_ECDSA_SHA384 = uint16(2)
+	SIGTYPE_ECDSA_SHA512 = uint16(3)
+	SIGTYPE_RSA_SHA256   = uint16(4)
+	SIGTYPE_RSA_SHA384   = uint16(5)
+	SIGTYPE_RSA_SHA512   = uint16(6)
 
-	// 8-9 Signature type
-	// 0x0000 = DSA-160
-	// 0x0001 = ECDSA-SHA256-P256
-	// 0x0002 = ECDSA-SHA384-P384
-	// 0x0003 = ECDSA-SHA512-P521
-	// 0x0004 = RSA-SHA256-2048
-	// 0x0005 = RSA-SHA384-3072
-	// 0x0006 = RSA-SHA512-4096
-	SignatureType [2]byte
+	CONTENT_TYPE_UNKNOWN = uint16(0)
+	CONTENT_TYPE_ROUTER  = uint16(1)
+	CONTENT_TYPE_PLUGIN  = uint16(2)
+	CONTENT_TYPE_RESEED  = uint16(3)
+	CONTENT_TYPE_NEWS    = uint16(4)
 
-	// 10-11   Signature length, e.g. 40 (0x0028) for DSA-160
-	SignatureLength [2]byte
+	FILE_TYPE_ZIP   = uint8(0)
+	FILE_TYPE_XML   = uint8(1)
+	FILE_TYPE_HTML  = uint8(2)
+	FILE_TYPE_XMLGZ = uint8(3)
+)
 
-	// 12  unused
-	Unused2 [1]byte
+type Su3File struct {
+	Magic           [6]byte
+	Format          [1]byte
+	SignatureType   uint16
+	SignatureLength uint16
+	VersionLength   uint8
+	SignerIdLength  uint8
+	ContentLength   uint64
+	FileType        [1]byte
+	ContentType     [1]byte
 
-	// 13  Version length (in bytes not chars, including padding) must be at least 16 (0x10) for compatibility
-	VersionLength [1]byte
+	Version     []byte
+	SignerId    []byte
+	Content     []byte
+	Signature   []byte
+	SignedBytes []byte
+}
 
-	// 14  unused
-	Unused3 [1]byte
+func (s *Su3File) String() string {
+	var b bytes.Buffer
 
-	// 15  Signer ID length (in bytes not chars)
-	SignerIdLength [1]byte
+	// header
+	fmt.Fprintln(&b, "---------------------------")
 
-	// 16-23   Content length (not including header or sig)
-	ContentLength [8]byte
+	fmt.Fprintf(&b, "Magic: %s\n", s.Magic)
+	fmt.Fprintf(&b, "Format: %q\n", s.Format)
+	fmt.Fprintf(&b, "SignatureType: %q\n", s.SignatureType)
+	fmt.Fprintf(&b, "SignatureLength: %s\n", s.SignatureLength)
+	fmt.Fprintf(&b, "VersionLength: %s\n", s.VersionLength)
+	fmt.Fprintf(&b, "SignerIdLength: %s\n", s.SignerIdLength)
+	fmt.Fprintf(&b, "ContentLength: %s\n", s.ContentLength)
+	fmt.Fprintf(&b, "FileType: %q\n", s.FileType)
+	fmt.Fprintf(&b, "ContentType: %q\n", s.ContentType)
 
-	// 24  unused
-	Unused4 [1]byte
+	// content
+	fmt.Fprintln(&b, "---------------------------")
 
-	// 25  File type
-	// 0x00 = zip file
-	// 0x01 = xml file (as of 0.9.15)
-	// 0x02 = html file (as of 0.9.17)
-	// 0x03 = xml.gz file (as of 0.9.17)
-	FileType [1]byte
+	fmt.Fprintf(&b, "Version: %q\n", bytes.Trim(s.Version, "\x00"))
+	fmt.Fprintf(&b, "SignerId: %q\n", s.SignerId)
+	// fmt.Fprintf(&b, "Content: %q\n", s.Content)
+	// fmt.Fprintf(&b, "Signature: %q\n", s.Signature)
 
-	// 26  unused
-	Unused5 [1]byte
+	fmt.Fprintln(&b, "---------------------------")
 
-	// 27  Content type
-	// 0x00 = unknown
-	// 0x01 = router update
-	// 0x02 = plugin or plugin update
-	// 0x03 = reseed data
-	// 0x04 = news feed (as of 0.9.15)
-	ContentType [1]byte
+	return b.String()
+}
 
-	// 28-39   unused
-	Unused6 [12]byte
+func (s *Su3File) VerifySignature() error {
+	return verifySig(s.SignatureType, s.SignerId, s.Signature, s.SignedBytes)
+}
+
+func uzipData(c []byte) ([]byte, error) {
+	input := bytes.NewReader(c)
+	zipReader, err := zip.NewReader(input, int64(len(c)))
+	if nil != err {
+		return nil, err
+	}
+
+	var uncompressed []byte
+	for _, f := range zipReader.File {
+		rc, err := f.Open()
+		if err != nil {
+			panic(err)
+		}
+		uncompressed = append(uncompressed, []byte(f.Name+"\n")...)
+		rc.Close()
+	}
+
+	return uncompressed, nil
+}
+
+func verifySig(sigType uint16, signer, signature, signed []byte) (err error) {
+	var cert *x509.Certificate
+	if cert, err = certForSigner(string(signer)); nil != err {
+		return err
+	}
+
+	var sigAlg x509.SignatureAlgorithm
+	switch sigType {
+	case SIGTYPE_DSA:
+		sigAlg = x509.DSAWithSHA1
+	case SIGTYPE_ECDSA_SHA256:
+		sigAlg = x509.ECDSAWithSHA256
+	case SIGTYPE_ECDSA_SHA384:
+		sigAlg = x509.ECDSAWithSHA384
+	case SIGTYPE_ECDSA_SHA512:
+		sigAlg = x509.ECDSAWithSHA512
+	case SIGTYPE_RSA_SHA256:
+		sigAlg = x509.SHA256WithRSA
+	case SIGTYPE_RSA_SHA384:
+		sigAlg = x509.SHA384WithRSA
+	case SIGTYPE_RSA_SHA512:
+		sigAlg = x509.SHA512WithRSA
+	default:
+		return fmt.Errorf("Unsupported signature type.")
+	}
+
+	return checkSignature(cert, sigAlg, signed, signature)
+}
+
+func ReadSu3(file *os.File, su3File *Su3File) error {
+	var (
+		skip    [1]byte
+		bigSkip [12]byte
+	)
+
+	// 0-5
+	binary.Read(file, binary.BigEndian, &su3File.Magic)
+	// 6
+	binary.Read(file, binary.BigEndian, &skip)
+	// 7
+	binary.Read(file, binary.BigEndian, &su3File.Format)
+	// 8-9
+	binary.Read(file, binary.BigEndian, &su3File.SignatureType)
+	// 10-11
+	binary.Read(file, binary.BigEndian, &su3File.SignatureLength)
+	// 12
+	binary.Read(file, binary.BigEndian, &skip)
+	// 13
+	binary.Read(file, binary.BigEndian, &su3File.VersionLength)
+	// 14
+	binary.Read(file, binary.BigEndian, &skip)
+	// 15
+	binary.Read(file, binary.BigEndian, &su3File.SignerIdLength)
+	// 16-23
+	binary.Read(file, binary.BigEndian, &su3File.ContentLength)
+	// 24
+	binary.Read(file, binary.BigEndian, &skip)
+	// 25
+	binary.Read(file, binary.BigEndian, &su3File.FileType)
+	// 26
+	binary.Read(file, binary.BigEndian, &skip)
+	// 27
+	binary.Read(file, binary.BigEndian, &su3File.ContentType)
+	// 28-39
+	binary.Read(file, binary.BigEndian, &bigSkip)
+
+	su3File.Version = make([]byte, su3File.VersionLength)
+	su3File.SignerId = make([]byte, su3File.SignerIdLength)
+	su3File.Content = make([]byte, su3File.ContentLength)
+	su3File.Signature = make([]byte, su3File.SignatureLength)
 
 	// 40-55+  Version, UTF-8 padded with trailing 0x00, 16 bytes minimum, length specified at byte 13. Do not append 0x00 bytes if the length is 16 or more.
+	binary.Read(file, binary.BigEndian, su3File.Version)
 	// xx+ ID of signer, (e.g. "zzz@mail.i2p") UTF-8, not padded, length specified at byte 15
+	binary.Read(file, binary.BigEndian, su3File.SignerId)
 	// xx+ Content, length and format specified in header
+	binary.Read(file, binary.BigEndian, su3File.Content)
+
+	// re-read from the beginning to get the signed content
+	signedEnd, _ := file.Seek(0, 1)
+	file.Seek(0, 0)
+	su3File.SignedBytes = make([]byte, signedEnd)
+	binary.Read(file, binary.BigEndian, su3File.SignedBytes)
+
 	// xx+ Signature, length specified in header, covers everything starting at byte 0
-	Version [16]byte
+	binary.Read(file, binary.BigEndian, su3File.Signature)
+
+	return nil
 }

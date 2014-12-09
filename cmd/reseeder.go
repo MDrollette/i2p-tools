@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 
+	// "github.com/MDrollette/go-i2p/reseed"
 	"github.com/codegangsta/cli"
 )
 

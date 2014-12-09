@@ -13,12 +13,9 @@ func main() {
 	app.Version = "0.1.0"
 	app.Usage = "I2P commands"
 	app.Flags = []cli.Flag{}
-	app.Before = func(c *cli.Context) error {
-		cmd.Init()
-		return nil
-	}
 	app.Commands = []cli.Command{
 		cmd.NewReseederCommand(),
+		cmd.NewSu3VerifyCommand(),
 	}
 
 	if err := app.Run(os.Args); err != nil {

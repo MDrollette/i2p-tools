@@ -1,19 +1,5 @@
 package reseed
 
-// read in all files from netdb dir into a slice of routerinfos
-
-// for every unique requesting IP
-// look up that IP in the db
-// - if it exists, check the creation time
-// - if the creation time is within the threshold, serve up the routerinfos
-// - if the creation time is outside the threshold, or if it does not exist generate a new slice of routerinfos from the current master set
-
-// at some regular interval, update the master slice with fresh netdb routerinfos
-
-// can serve up html/ul of routerinfos
-// can serve up su3 signed file
-// https://geti2p.net/en/docs/spec/updates
-
 import (
 	"bytes"
 	"fmt"
