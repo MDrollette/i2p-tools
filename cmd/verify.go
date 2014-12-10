@@ -25,8 +25,8 @@ func su3VerifyAction(c *cli.Context) {
 	}
 	defer file.Close()
 
-	su3File := su3.Su3File{}
-	if err := su3.ReadSu3(file, &su3File); err != nil {
+	su3File, err := su3.ReadSu3(file)
+	if err != nil {
 		panic(err)
 	}
 

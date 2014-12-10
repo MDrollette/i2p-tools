@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/MDrollette/go-i2p/reseed"
-	"github.com/MDrollette/go-i2p/su3"
 	"github.com/codegangsta/cli"
 )
 
@@ -51,9 +50,10 @@ func su3Action(c *cli.Context) {
 
 	// create an SU3 from the seed
 	su3File, err := reseeder.CreateSu3(seeds)
-	su3File.SetSignerId("matt@drollette.com")
+
 	// sign the su3 with our key
-	su3File.Sign(privKey, su3.SIGTYPE_RSA_SHA512)
+	su3File.SignerId = []byte("matt@drollette.com")
+	su3File.Sign(privKey)
 
 	//write the file to disk
 	ioutil.WriteFile("i2pseeds.su3", su3File.Bytes(), 0777)

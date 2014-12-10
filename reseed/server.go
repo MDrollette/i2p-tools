@@ -74,7 +74,7 @@ func (rs *ReseederImpl) CreateSu3(seeds Seed) (*su3.Su3File, error) {
 	if nil != err {
 		return nil, err
 	}
-	su3File.SetContent(zipped)
+	su3File.Content = zipped
 
 	return su3File, nil
 }
