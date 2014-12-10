@@ -14,8 +14,10 @@ func main() {
 	app.Usage = "I2P commands"
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
-		cmd.NewReseederCommand(),
+		cmd.NewReseedCommand(),
 		cmd.NewSu3VerifyCommand(),
+		cmd.NewKeygenCommand(),
+		cmd.NewSu3Command(),
 	}
 
 	if err := app.Run(os.Args); err != nil {

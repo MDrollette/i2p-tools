@@ -1,18 +1,20 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 
-	// "github.com/MDrollette/go-i2p/reseed"
+	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/codegangsta/cli"
 )
 
-func NewReseederCommand() cli.Command {
+func NewReseedCommand() cli.Command {
 	return cli.Command{
-		Name:        "reseeder",
+		Name:        "reseed",
 		Usage:       "Start a reseed server",
 		Description: "Start a reseed server",
-		Action:      reseederAction,
+		Action:      reseedAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "addr",
@@ -23,6 +25,24 @@ func NewReseederCommand() cli.Command {
 	}
 }
 
-func reseederAction(c *cli.Context) {
+func reseedAction(c *cli.Context) {
 	log.Println("Starting server on", c.String("addr"))
+
+	netdb := reseed.NewLocalNetDb(c.Args().Get(0))
+	reseeder := reseed.NewReseeder(netdb)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		peer := reseeder.Peer(r)
+		seeds, err := reseeder.Seed(peer)
+		if nil != err {
+			fmt.Fprintf(w, "Problem: '%s'", err)
+			return
+		}
+
+		for _, s := range seeds {
+			fmt.Fprintf(w, "%s\n", s.Name)
+		}
+	})
+
+	http.ListenAndServe("127.0.0.1:9090", nil)
 }

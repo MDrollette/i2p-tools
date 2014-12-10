@@ -3,14 +3,20 @@ package su3
 import (
 	"archive/zip"
 	"bytes"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 const (
-	MAGIC_BYTES = "I2Psu3"
+	MAGIC_BYTES        = "I2Psu3"
+	MIN_VERSION_LENGTH = 16
 
 	SIGTYPE_DSA          = uint16(0)
 	SIGTYPE_ECDSA_SHA256 = uint16(1)
@@ -34,20 +40,143 @@ const (
 
 type Su3File struct {
 	Magic           [6]byte
-	Format          [1]byte
+	Format          uint8
 	SignatureType   uint16
 	SignatureLength uint16
 	VersionLength   uint8
 	SignerIdLength  uint8
 	ContentLength   uint64
-	FileType        [1]byte
-	ContentType     [1]byte
+	FileType        uint8
+	ContentType     uint16
 
 	Version     []byte
 	SignerId    []byte
 	Content     []byte
 	Signature   []byte
 	SignedBytes []byte
+}
+
+func NewSu3File() *Su3File {
+	var a [6]byte
+	copy(a[:], MAGIC_BYTES)
+	s := Su3File{Magic: a}
+	s.SetVersion(strconv.FormatInt(time.Now().Unix(), 10))
+	return &s
+}
+
+func (s *Su3File) SetSignerId(signer string) {
+	s.SignerId = []byte(signer)
+	s.SignerIdLength = uint8(len(s.SignerId))
+}
+
+func (s *Su3File) SetContent(content []byte) {
+	s.Content = content
+	s.ContentLength = uint64(len(s.Content))
+}
+
+func (s *Su3File) SetVersion(version string) {
+	s.Version = []byte(version)
+
+	minBytes := make([]byte, MIN_VERSION_LENGTH)
+	if len(s.Version) < len(minBytes) {
+		copy(minBytes, s.Version)
+		s.Version = minBytes
+	}
+
+	s.VersionLength = uint8(len(s.Version))
+}
+
+func (s *Su3File) Sign(privkey *rsa.PrivateKey, sigType uint16) error {
+	var hashType crypto.Hash
+	switch sigType {
+	// case SIGTYPE_DSA:
+	// case SIGTYPE_ECDSA_SHA256:
+	// case SIGTYPE_ECDSA_SHA384:
+	// case SIGTYPE_ECDSA_SHA512:
+	// case SIGTYPE_RSA_SHA256:
+	// case SIGTYPE_RSA_SHA384:
+	case SIGTYPE_RSA_SHA512:
+		s.SignatureType = SIGTYPE_RSA_SHA512
+		s.SignatureLength = uint16(512)
+		hashType = crypto.SHA512
+	default:
+		return fmt.Errorf("Unknown signature type")
+	}
+
+	h := hashType.New()
+	h.Write(s.ContentBytes())
+	digest := h.Sum(nil)
+
+	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, 0, digest)
+	if nil != err {
+		return err
+	}
+
+	s.Signature = sig
+
+	return nil
+}
+
+func (s *Su3File) ContentBytes() []byte {
+	buf := new(bytes.Buffer)
+
+	var (
+		skip    [1]byte
+		bigSkip [12]byte
+	)
+
+	// 0-5
+	binary.Write(buf, binary.BigEndian, s.Magic)
+	// 6
+	binary.Write(buf, binary.BigEndian, skip)
+	// 7
+	binary.Write(buf, binary.BigEndian, s.Format)
+	// 8-9
+	binary.Write(buf, binary.BigEndian, s.SignatureType)
+	// 10-11
+	binary.Write(buf, binary.BigEndian, s.SignatureLength)
+	// 12
+	binary.Write(buf, binary.BigEndian, skip)
+	// 13
+	binary.Write(buf, binary.BigEndian, s.VersionLength)
+	// 14
+	binary.Write(buf, binary.BigEndian, skip)
+	// 15
+	binary.Write(buf, binary.BigEndian, s.SignerIdLength)
+	// 16-23
+	binary.Write(buf, binary.BigEndian, s.ContentLength)
+	// 24
+	binary.Write(buf, binary.BigEndian, skip)
+	// 25
+	binary.Write(buf, binary.BigEndian, s.FileType)
+	// 26
+	binary.Write(buf, binary.BigEndian, skip)
+	// 27
+	binary.Write(buf, binary.BigEndian, s.ContentType)
+	// 28-39
+	binary.Write(buf, binary.BigEndian, bigSkip)
+	// 40-55+  Version, UTF-8 padded with trailing 0x00, 16 bytes minimum, length specified at byte 13. Do not append 0x00 bytes if the length is 16 or more.
+	binary.Write(buf, binary.BigEndian, s.Version)
+	// xx+ ID of signer, (e.g. "zzz@mail.i2p") UTF-8, not padded, length specified at byte 15
+	binary.Write(buf, binary.BigEndian, s.SignerId)
+	// xx+ Content, length and format specified in header
+	binary.Write(buf, binary.BigEndian, s.Content)
+
+	return buf.Bytes()
+}
+
+func (s *Su3File) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	buf.Write(s.ContentBytes())
+
+	// xx+ Signature, length specified in header, covers everything starting at byte 0
+	binary.Write(buf, binary.BigEndian, s.Signature)
+
+	return buf.Bytes()
+}
+
+func (s *Su3File) VerifySignature() error {
+	return verifySig(s.SignatureType, s.SignerId, s.Signature, s.SignedBytes)
 }
 
 func (s *Su3File) String() string {
@@ -72,15 +201,11 @@ func (s *Su3File) String() string {
 	fmt.Fprintf(&b, "Version: %q\n", bytes.Trim(s.Version, "\x00"))
 	fmt.Fprintf(&b, "SignerId: %q\n", s.SignerId)
 	// fmt.Fprintf(&b, "Content: %q\n", s.Content)
-	// fmt.Fprintf(&b, "Signature: %q\n", s.Signature)
+	fmt.Fprintf(&b, "Signature: %q\n", s.Signature)
 
 	fmt.Fprintln(&b, "---------------------------")
 
 	return b.String()
-}
-
-func (s *Su3File) VerifySignature() error {
-	return verifySig(s.SignatureType, s.SignerId, s.Signature, s.SignedBytes)
 }
 
 func uzipData(c []byte) ([]byte, error) {

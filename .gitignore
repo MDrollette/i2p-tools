@@ -1,5 +1,7 @@
 /i2p-reseeder
 /cert.pem
 /key.pem
-/netdb
+/_netdb
 i2pseeds.su3
+reseed_cert.pem
+reseed_private.pem

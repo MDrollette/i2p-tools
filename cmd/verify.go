@@ -30,11 +30,11 @@ func su3VerifyAction(c *cli.Context) {
 		panic(err)
 	}
 
+	fmt.Println(su3File.String())
+
 	if err := su3File.VerifySignature(); nil != err {
 		panic(err)
 	}
-
-	fmt.Println(su3File.String())
 
 	fmt.Println("Verified signature.")
 }
