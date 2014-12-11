@@ -18,6 +18,7 @@ func main() {
 		cmd.NewSu3VerifyCommand(),
 		cmd.NewKeygenCommand(),
 		cmd.NewSu3Command(),
+		cmd.NewSu3VerifyPublicCommand(),
 	}
 
 	if err := app.Run(os.Args); err != nil {

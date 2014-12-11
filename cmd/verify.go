@@ -25,7 +25,7 @@ func su3VerifyAction(c *cli.Context) {
 	}
 	defer file.Close()
 
-	su3File, err := su3.ReadSu3(file)
+	su3File, err := su3.Parse(file)
 	if err != nil {
 		panic(err)
 	}
@@ -36,5 +36,5 @@ func su3VerifyAction(c *cli.Context) {
 		panic(err)
 	}
 
-	fmt.Println("Verified signature.")
+	fmt.Printf("Signature is valid for signer '%s'\n", su3File.SignerId)
 }
