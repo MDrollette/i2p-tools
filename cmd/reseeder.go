@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/codegangsta/cli"
@@ -18,31 +17,60 @@ func NewReseedCommand() cli.Command {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "addr",
-				Value: "127.0.0.1:8080",
+				Value: "127.0.0.1:9090",
 				Usage: "IP and port to listen on",
+			},
+			cli.StringFlag{
+				Name:  "netdb",
+				Usage: "Path to NetDB directory containing routerInfos",
+			},
+			cli.StringFlag{
+				Name:  "tlscert",
+				Value: "cert.pem",
+				Usage: "Path to tls certificate",
+			},
+			cli.StringFlag{
+				Name:  "tlskey",
+				Value: "key.pem",
+				Usage: "Path to tls key",
+			},
+			cli.StringFlag{
+				Name:  "keyfile",
+				Value: "reseed_private.pem",
+				Usage: "Path to your su3 signing private key",
 			},
 		},
 	}
 }
 
 func reseedAction(c *cli.Context) {
-	log.Println("Starting server on", c.String("addr"))
+	netdbDir := c.String("netdb")
+	if netdbDir == "" {
+		fmt.Println("--netdb is required")
+		return
+	}
 
-	netdb := reseed.NewLocalNetDb(c.Args().Get(0))
+	// load our signing privKey
+	privKey, err := loadPrivateKey(c.String("keyfile"))
+	if nil != err {
+		log.Fatalln(err)
+	}
+
+	// create a local file netdb provider
+	netdb := reseed.NewLocalNetDb(netdbDir)
+
+	// create a reseeder
 	reseeder := reseed.NewReseeder(netdb)
+	reseeder.SigningKey = privKey
+	reseeder.SignerId = []byte("matt@drollette.com")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		peer := reseeder.Peer(r)
-		seeds, err := reseeder.Seed(peer)
-		if nil != err {
-			fmt.Fprintf(w, "Problem: '%s'", err)
-			return
-		}
+	// create a server
+	server := reseed.NewServer()
+	server.Reseeder = reseeder
+	server.Addr = c.String("addr")
 
-		for _, s := range seeds {
-			fmt.Fprintf(w, "%s\n", s.Name)
-		}
-	})
+	// @todo generate self-signed keys if they don't exist
 
-	http.ListenAndServe("127.0.0.1:9090", nil)
+	log.Printf("Server listening on %s\n", server.Addr)
+	server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey"))
 }

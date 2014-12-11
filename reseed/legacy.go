@@ -22,21 +22,6 @@ const (
 	LIST_TEMPLATE = `<html><head><title>NetDB</title></head><body><ul>{{ range $index, $_ := . }}<li><a href="{{ $index }}">{{ $index }}</a></li>{{ end }}</ul></body></html>`
 )
 
-func proxiedHandler(h http.Handler) http.Handler {
-	return remoteAddrFixup{h}
-}
-
-type remoteAddrFixup struct {
-	h http.Handler
-}
-
-func (h remoteAddrFixup) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if prior, ok := r.Header["X-Forwarded-For"]; ok {
-		r.RemoteAddr = prior[0]
-	}
-	h.h.ServeHTTP(w, r)
-}
-
 type Config struct {
 	NetDBDir        string
 	RefreshInterval time.Duration
@@ -66,10 +51,6 @@ func Run(config *Config) {
 
 	th := throttled.RateLimit(throttled.PerMin(config.RateLimit), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(1000))
 	muxWithMiddlewares := th.Throttle(r)
-
-	if config.Proxy {
-		muxWithMiddlewares = proxiedHandler(muxWithMiddlewares)
-	}
 
 	if config.Verbose {
 		muxWithMiddlewares = handlers.CombinedLoggingHandler(os.Stdout, muxWithMiddlewares)

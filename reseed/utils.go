@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 )
 
-func zipSeeds(seeds Seed) ([]byte, error) {
+func zipSeeds(seeds Seeds) ([]byte, error) {
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
 
@@ -32,14 +32,14 @@ func zipSeeds(seeds Seed) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func uzipSeeds(c []byte) (Seed, error) {
+func uzipSeeds(c []byte) (Seeds, error) {
 	input := bytes.NewReader(c)
 	zipReader, err := zip.NewReader(input, int64(len(c)))
 	if nil != err {
 		return nil, err
 	}
 
-	var seeds Seed
+	var seeds Seeds
 	for _, f := range zipReader.File {
 		rc, err := f.Open()
 		if err != nil {

@@ -19,8 +19,8 @@ import (
 func NewKeygenCommand() cli.Command {
 	return cli.Command{
 		Name:        "keygen",
-		Usage:       "Generate keys for reseed Su3 signing",
-		Description: "Generate keys for reseed Su3 signing",
+		Usage:       "Generate keys for reseed SU3 signing",
+		Description: "Generate keys for reseed SU3 signing",
 		Action:      keygenAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{

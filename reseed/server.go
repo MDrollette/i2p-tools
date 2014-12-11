@@ -1,128 +1,89 @@
 package reseed
 
 import (
-	"io/ioutil"
-	"log"
-	"math/rand"
+	"bytes"
+	"crypto/tls"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"regexp"
-	"sync"
 
-	"github.com/MDrollette/go-i2p/su3"
+	"github.com/PuerkitoBio/throttled"
+	"github.com/PuerkitoBio/throttled/store"
+	"github.com/gorilla/handlers"
+	"github.com/justinas/alice"
 )
 
-type routerInfo struct {
-	Name string
-	Data []byte
+const (
+	I2P_USER_AGENT = "Wget/1.11.4"
+)
+
+type Server struct {
+	*http.Server
+	Reseeder Reseeder
 }
 
-type Peer string
-type Seed []routerInfo
+func NewServer() *Server {
+	config := &tls.Config{MinVersion: tls.VersionTLS10}
+	h := &http.Server{TLSConfig: config}
+	server := Server{h, nil}
 
-type Reseeder interface {
-	// seed a peer with routerinfos
-	Seed(p Peer) (Seed, error)
-	// get a peer from a given request
-	Peer(r *http.Request) Peer
-	// create an Su3 file from the given seeds
-	CreateSu3(seeds Seed) (*su3.Su3File, error)
+	th := throttled.RateLimit(throttled.PerHour(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(10000))
+
+	middlewareChain := alice.New(proxiedMiddleware, loggingMiddleware, verifyMiddleware, th.Throttle)
+
+	mux := http.NewServeMux()
+	mux.Handle("/i2pseeds.su3", middlewareChain.Then(http.HandlerFunc(server.reseedHandler)))
+	server.Handler = mux
+
+	return &server
 }
 
-type ReseederImpl struct {
-	netdb NetDbProvider
-	peers map[string]Peer
-	m     sync.Mutex
+func (s *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Index")
 }
 
-func NewReseeder(netdb NetDbProvider) *ReseederImpl {
-	return &ReseederImpl{
-		netdb: netdb,
-		peers: make(map[string]Peer),
-	}
-}
+func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
+	peer := s.Reseeder.Peer(r)
 
-func (rs *ReseederImpl) Seed(p Peer) (Seed, error) {
-	all, err := rs.netdb.RouterInfos()
+	seeds, err := s.Reseeder.Seeds(peer)
 	if nil != err {
-		return nil, err
-	}
-
-	return Seed(all), nil
-}
-
-func (rs *ReseederImpl) Peer(r *http.Request) Peer {
-	rs.m.Lock()
-	defer rs.m.Unlock()
-
-	if p, ok := rs.peers[r.RemoteAddr]; !ok {
-		rs.peers[r.RemoteAddr] = Peer(r.RemoteAddr)
-	} else {
-		return p
-	}
-
-	return rs.peers[r.RemoteAddr]
-}
-
-func (rs *ReseederImpl) CreateSu3(seeds Seed) (*su3.Su3File, error) {
-	su3File := su3.NewSu3File()
-	su3File.FileType = su3.FILE_TYPE_ZIP
-	su3File.ContentType = su3.CONTENT_TYPE_RESEED
-
-	zipped, err := zipSeeds(seeds)
-	if nil != err {
-		return nil, err
-	}
-	su3File.Content = zipped
-
-	return su3File, nil
-}
-
-type NetDbProvider interface {
-	// Get all router infos
-	RouterInfos() ([]routerInfo, error)
-}
-
-type LocalNetDbImpl struct {
-	Path string
-}
-
-func NewLocalNetDb(path string) *LocalNetDbImpl {
-	return &LocalNetDbImpl{
-		Path: path,
-	}
-}
-
-func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
-	var src []os.FileInfo
-	if src, err = ioutil.ReadDir(db.Path); nil != err {
+		http.Error(w, "500 Unable to provide seeds", http.StatusInternalServerError)
 		return
 	}
 
-	// randomize the file order
-	files := make([]os.FileInfo, len(src))
-	perm := rand.Perm(len(src))
-	for i, v := range perm {
-		files[v] = src[i]
+	su3, err := s.Reseeder.CreateSu3(seeds)
+	if nil != err {
+		http.Error(w, "500 Unable to generate SU3", http.StatusInternalServerError)
+		return
 	}
 
-	r, _ := regexp.Compile("^routerInfo-[A-Za-z0-9-=~]+.dat$")
+	io.Copy(w, bytes.NewReader(su3.Bytes()))
+}
 
-	for _, file := range files {
-		if r.MatchString(file.Name()) {
-			riBytes, err := ioutil.ReadFile(filepath.Join(db.Path, file.Name()))
-			if nil != err {
-				log.Println(err)
-				continue
-			}
+func loggingMiddleware(next http.Handler) http.Handler {
+	return handlers.CombinedLoggingHandler(os.Stdout, next)
+}
 
-			routerInfos = append(routerInfos, routerInfo{
-				Name: file.Name(),
-				Data: riBytes,
-			})
+func verifyMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		if I2P_USER_AGENT != r.UserAgent() {
+			http.Error(w, "403 Forbidden", http.StatusForbidden)
+			return
 		}
-	}
 
-	return
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
+}
+
+func proxiedMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		if prior, ok := r.Header["X-Forwarded-For"]; ok {
+			r.RemoteAddr = prior[0]
+		}
+
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
 }
