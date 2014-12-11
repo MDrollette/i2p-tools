@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"io/ioutil"
 
 	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/MDrollette/go-i2p/su3"
@@ -20,14 +20,13 @@ func NewSu3VerifyCommand() cli.Command {
 }
 
 func su3VerifyAction(c *cli.Context) {
-	file, err := os.Open(c.Args().Get(0))
-	if err != nil {
+	su3File := su3.Su3File{}
+
+	data, err := ioutil.ReadFile(c.Args().Get(0))
+	if nil != err {
 		panic(err)
 	}
-	defer file.Close()
-
-	su3File, err := su3.Parse(file)
-	if err != nil {
+	if err := su3File.UnmarshalBinary(data); err != nil {
 		panic(err)
 	}
 

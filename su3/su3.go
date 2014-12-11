@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"strconv"
 	"time"
 )
@@ -145,7 +144,7 @@ func (s *Su3File) BodyBytes() []byte {
 	return buf.Bytes()
 }
 
-func (s *Su3File) Bytes() []byte {
+func (s *Su3File) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	// write the body
@@ -153,7 +152,50 @@ func (s *Su3File) Bytes() []byte {
 	// append the signature
 	binary.Write(buf, binary.BigEndian, s.Signature)
 
-	return buf.Bytes()
+	return buf.Bytes(), nil
+}
+
+func (s *Su3File) UnmarshalBinary(data []byte) error {
+	var (
+		r = bytes.NewReader(data)
+
+		magic   = MAGIC_BYTES
+		skip    [1]byte
+		bigSkip [12]byte
+
+		signatureLength uint16
+		versionLength   uint8
+		signerIdLength  uint8
+		contentLength   uint64
+	)
+
+	binary.Read(r, binary.BigEndian, &magic)
+	binary.Read(r, binary.BigEndian, &skip)
+	binary.Read(r, binary.BigEndian, &s.Format)
+	binary.Read(r, binary.BigEndian, &s.SignatureType)
+	binary.Read(r, binary.BigEndian, &signatureLength)
+	binary.Read(r, binary.BigEndian, &skip)
+	binary.Read(r, binary.BigEndian, &versionLength)
+	binary.Read(r, binary.BigEndian, &skip)
+	binary.Read(r, binary.BigEndian, &signerIdLength)
+	binary.Read(r, binary.BigEndian, &contentLength)
+	binary.Read(r, binary.BigEndian, &skip)
+	binary.Read(r, binary.BigEndian, &s.FileType)
+	binary.Read(r, binary.BigEndian, &skip)
+	binary.Read(r, binary.BigEndian, &s.ContentType)
+	binary.Read(r, binary.BigEndian, &bigSkip)
+
+	s.Version = make([]byte, versionLength)
+	s.SignerId = make([]byte, signerIdLength)
+	s.Content = make([]byte, contentLength)
+	s.Signature = make([]byte, signatureLength)
+
+	binary.Read(r, binary.BigEndian, &s.Version)
+	binary.Read(r, binary.BigEndian, &s.SignerId)
+	binary.Read(r, binary.BigEndian, &s.Content)
+	binary.Read(r, binary.BigEndian, &s.Signature)
+
+	return nil
 }
 
 func (s *Su3File) VerifySignature(cert *x509.Certificate) error {
@@ -199,47 +241,4 @@ func (s *Su3File) String() string {
 	// fmt.Fprintln(&b, "---------------------------")
 
 	return b.String()
-}
-
-func Parse(r io.Reader) (*Su3File, error) {
-	var (
-		s = Su3File{}
-
-		magic   = MAGIC_BYTES
-		skip    [1]byte
-		bigSkip [12]byte
-
-		signatureLength uint16
-		versionLength   uint8
-		signerIdLength  uint8
-		contentLength   uint64
-	)
-
-	binary.Read(r, binary.BigEndian, &magic)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.Format)
-	binary.Read(r, binary.BigEndian, &s.SignatureType)
-	binary.Read(r, binary.BigEndian, &signatureLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &versionLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &signerIdLength)
-	binary.Read(r, binary.BigEndian, &contentLength)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.FileType)
-	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &s.ContentType)
-	binary.Read(r, binary.BigEndian, &bigSkip)
-
-	s.Version = make([]byte, versionLength)
-	s.SignerId = make([]byte, signerIdLength)
-	s.Content = make([]byte, contentLength)
-	s.Signature = make([]byte, signatureLength)
-
-	binary.Read(r, binary.BigEndian, &s.Version)
-	binary.Read(r, binary.BigEndian, &s.SignerId)
-	binary.Read(r, binary.BigEndian, &s.Content)
-	binary.Read(r, binary.BigEndian, &s.Signature)
-
-	return &s, nil
 }

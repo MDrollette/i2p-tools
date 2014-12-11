@@ -61,12 +61,15 @@ func su3Action(c *cli.Context) {
 	seeds, err := reseeder.Seeds(reseed.Peer("127.0.0.1"))
 	if nil != err {
 		log.Fatalln(err)
-		return
 	}
 
 	// create an SU3 from the seed
 	su3File, err := reseeder.CreateSu3(seeds)
 
 	//write the file to disk
-	ioutil.WriteFile("i2pseeds.su3", su3File.Bytes(), 0777)
+	data, err := su3File.MarshalBinary()
+	if nil != err {
+		log.Fatalln(err)
+	}
+	ioutil.WriteFile("i2pseeds.su3", data, 0777)
 }

@@ -118,7 +118,12 @@ func (rs *ReseederImpl) rebuild() error {
 			return err
 		}
 
-		newSu3s[i] = gs.Bytes()
+		data, err := gs.MarshalBinary()
+		if nil != err {
+			return err
+		}
+
+		newSu3s[i] = data
 	}
 
 	rs.su3s <- newSu3s

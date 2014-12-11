@@ -3,6 +3,7 @@ package cmd
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -89,11 +90,14 @@ func validate(responses chan *http.Response) {
 			continue
 		}
 
-		su3File, err := su3.Parse(resp.Body)
-		if err != nil {
+		su3File := su3.Su3File{}
+		data, err := ioutil.ReadAll(resp.Body)
+		if nil != err {
 			fmt.Println("Invalid: Unable to parse SU3 file:", err)
 		}
-		resp.Body.Close()
+		if err := su3File.UnmarshalBinary(data); err != nil {
+			fmt.Println("Invalid: Unable to parse SU3 file:", err)
+		}
 
 		cert, err := ks.ReseederCertificate(su3File.SignerId)
 		if nil != err {
