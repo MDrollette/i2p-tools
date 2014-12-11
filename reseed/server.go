@@ -34,7 +34,7 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	if trustProxy {
 		middlewareChain.Append(proxiedMiddleware)
 	}
-	middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle)
+	middlewareChain = middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle)
 
 	mux := http.NewServeMux()
 	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Then(http.HandlerFunc(server.reseedHandler)))
