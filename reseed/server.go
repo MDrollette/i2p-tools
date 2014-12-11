@@ -32,7 +32,7 @@ func NewServer(prefix string, trustProxy bool) *Server {
 
 	middlewareChain := alice.New()
 	if trustProxy {
-		middlewareChain.Append(proxiedMiddleware)
+		middlewareChain = middlewareChain.Append(proxiedMiddleware)
 	}
 
 	errorHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
