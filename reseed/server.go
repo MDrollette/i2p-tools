@@ -34,10 +34,14 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	if trustProxy {
 		middlewareChain.Append(proxiedMiddleware)
 	}
-	middlewareChain = middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle)
+
+	errorHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
 
 	mux := http.NewServeMux()
-	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Then(http.HandlerFunc(server.reseedHandler)))
+	mux.Handle("/", middlewareChain.Append(loggingMiddleware).Then(errorHandler))
+	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle).Then(http.HandlerFunc(server.reseedHandler)))
 	server.Handler = mux
 
 	return &server
