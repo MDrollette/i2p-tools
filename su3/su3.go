@@ -1,7 +1,6 @@
 package su3
 
 import (
-	"archive/zip"
 	"bytes"
 	"crypto"
 	"crypto/rand"
@@ -156,7 +155,7 @@ func (s *Su3File) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func (s *Su3File) VerifySignature() error {
+func (s *Su3File) VerifySignature(cert *x509.Certificate) error {
 	var sigAlg x509.SignatureAlgorithm
 	switch s.SignatureType {
 	case SIGTYPE_DSA:
@@ -177,11 +176,7 @@ func (s *Su3File) VerifySignature() error {
 		return fmt.Errorf("Unsupported signature type.")
 	}
 
-	if cert, err := signerCertificate(string(s.SignerId)); nil != err {
-		return err
-	} else {
-		return checkSignature(cert, sigAlg, s.BodyBytes(), s.Signature)
-	}
+	return checkSignature(cert, sigAlg, s.BodyBytes(), s.Signature)
 }
 
 func (s *Su3File) String() string {
@@ -203,26 +198,6 @@ func (s *Su3File) String() string {
 	// fmt.Fprintln(&b, "---------------------------")
 
 	return b.String()
-}
-
-func uzipData(c []byte) ([]byte, error) {
-	input := bytes.NewReader(c)
-	zipReader, err := zip.NewReader(input, int64(len(c)))
-	if nil != err {
-		return nil, err
-	}
-
-	var uncompressed []byte
-	for _, f := range zipReader.File {
-		rc, err := f.Open()
-		if err != nil {
-			panic(err)
-		}
-		uncompressed = append(uncompressed, []byte(f.Name+"\n")...)
-		rc.Close()
-	}
-
-	return uncompressed, nil
 }
 
 func Parse(r io.Reader) (*Su3File, error) {

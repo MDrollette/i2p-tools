@@ -12,6 +12,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/codegangsta/cli"
 )
 
@@ -23,7 +24,7 @@ func NewKeygenCommand() cli.Command {
 		Action:      keygenAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "signer",
+				Name:  "email",
 				Usage: "Your email address (ex. something@mail.i2p)",
 			},
 		},
@@ -31,18 +32,29 @@ func NewKeygenCommand() cli.Command {
 }
 
 func keygenAction(c *cli.Context) {
-	//"CN=" + cname + ",OU=" + ou + ",O=I2P Anonymous Network,L=XX,ST=XX,C=XX",
+	signer := c.String("email")
+	if signer == "" {
+		log.Fatalln("You must specify an email address (ex. --email=something@mail.i2p)")
+	}
+
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		log.Fatalf("failed to generate serial number: %s", err)
+	}
+
 	template := &x509.Certificate{
 		BasicConstraintsValid: true,
 		IsCA:         true,
-		SubjectKeyId: []byte{1, 2, 3},
-		SerialNumber: big.NewInt(1234),
+		SubjectKeyId: []byte(signer),
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization:       []string{"I2P Anonymous Network"},
 			OrganizationalUnit: []string{"I2P"},
 			Locality:           []string{"XX"},
 			StreetAddress:      []string{"XX"},
 			Country:            []string{"XX"},
+			CommonName:         signer,
 		},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().AddDate(10, 0, 0),
@@ -51,6 +63,7 @@ func keygenAction(c *cli.Context) {
 	}
 
 	// generate private key
+	fmt.Println("Generating keys. This may take a moment...")
 	privatekey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		log.Fatalln(err)
@@ -78,11 +91,12 @@ func keygenAction(c *cli.Context) {
 	fmt.Println("private key saved to reseed_private.pem")
 
 	// save cert
-	certOut, err := os.Create("reseed_cert.pem")
+	filename := reseed.SignerFilename(signer)
+	certOut, err := os.Create(filename)
 	if err != nil {
-		log.Fatalf("failed to open reseed_cert.pem for writing: %s", err)
+		log.Fatalf("failed to open %s for writing: %s", filename, err)
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert})
 	certOut.Close()
-	fmt.Println("certificate saved to reseed_cert.pem")
+	fmt.Println("certificate saved to", filename)
 }

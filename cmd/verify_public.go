@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/MDrollette/go-i2p/su3"
 	"github.com/codegangsta/cli"
 )
@@ -57,7 +58,6 @@ func download(out chan *http.Response, urls []string) {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-
 			req, err := http.NewRequest("GET", fmt.Sprintf("%si2pseeds.su3", url), nil)
 			if err != nil {
 				log.Fatalln(err)
@@ -77,6 +77,8 @@ func download(out chan *http.Response, urls []string) {
 }
 
 func validate(in chan *http.Response) {
+	ks := reseed.KeyStore{Path: "./certificates"}
+
 	for resp := range in {
 		fmt.Printf("Validating: %s\n", resp.Request.URL)
 
@@ -92,7 +94,14 @@ func validate(in chan *http.Response) {
 		}
 		resp.Body.Close()
 
-		if err := su3File.VerifySignature(); nil != err {
+		cert, err := ks.ReseederCertificate(su3File.SignerId)
+		if nil != err {
+			fmt.Println("Invalid: Unable to find public key.", err)
+			fmt.Println("")
+			continue
+		}
+
+		if err := su3File.VerifySignature(cert); nil != err {
 			fmt.Println("Invalid: Unable to verify signature", err)
 		} else {
 			fmt.Printf("Valid: For signer '%s'\n", su3File.SignerId)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/MDrollette/go-i2p/su3"
 	"github.com/codegangsta/cli"
 )
@@ -32,7 +33,14 @@ func su3VerifyAction(c *cli.Context) {
 
 	fmt.Println(su3File.String())
 
-	if err := su3File.VerifySignature(); nil != err {
+	// get the reseeder key
+	ks := reseed.KeyStore{Path: "./certificates"}
+	cert, err := ks.ReseederCertificate(su3File.SignerId)
+	if nil != err {
+		panic(err)
+	}
+
+	if err := su3File.VerifySignature(cert); nil != err {
 		panic(err)
 	}
 
