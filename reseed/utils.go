@@ -3,6 +3,7 @@ package reseed
 import (
 	"archive/zip"
 	"bytes"
+	"io/ioutil"
 )
 
 func zipSeeds(seeds Seed) ([]byte, error) {
@@ -31,22 +32,27 @@ func zipSeeds(seeds Seed) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func uzipSeeds(c []byte) ([]byte, error) {
+func uzipSeeds(c []byte) (Seed, error) {
 	input := bytes.NewReader(c)
 	zipReader, err := zip.NewReader(input, int64(len(c)))
 	if nil != err {
 		return nil, err
 	}
 
-	var uncompressed []byte
+	var seeds Seed
 	for _, f := range zipReader.File {
 		rc, err := f.Open()
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
-		uncompressed = append(uncompressed, []byte(f.Name+"\n")...)
+		data, err := ioutil.ReadAll(rc)
 		rc.Close()
+		if nil != err {
+			return nil, err
+		}
+
+		seeds = append(seeds, routerInfo{Name: f.Name, Data: data})
 	}
 
-	return uncompressed, nil
+	return seeds, nil
 }
