@@ -3,10 +3,10 @@ package reseed
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/PuerkitoBio/throttled"
 	"github.com/PuerkitoBio/throttled/store"
@@ -28,7 +28,7 @@ func NewServer() *Server {
 	h := &http.Server{TLSConfig: config}
 	server := Server{h, nil}
 
-	th := throttled.RateLimit(throttled.PerHour(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(10000))
+	th := throttled.RateLimit(throttled.PerHour(120), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(10000))
 
 	middlewareChain := alice.New(proxiedMiddleware, loggingMiddleware, verifyMiddleware, th.Throttle)
 
@@ -39,26 +39,20 @@ func NewServer() *Server {
 	return &server
 }
 
-func (s *Server) indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Index")
-}
-
 func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 	peer := s.Reseeder.Peer(r)
 
-	seeds, err := s.Reseeder.Seeds(peer)
+	su3, err := s.Reseeder.PeerSu3Bytes(peer)
 	if nil != err {
-		http.Error(w, "500 Unable to provide seeds", http.StatusInternalServerError)
+		http.Error(w, "500 Unable to get SU3", http.StatusInternalServerError)
 		return
 	}
 
-	su3, err := s.Reseeder.CreateSu3(seeds)
-	if nil != err {
-		http.Error(w, "500 Unable to generate SU3", http.StatusInternalServerError)
-		return
-	}
+	w.Header().Set("Content-Disposition", "attachment; filename=i2pseeds.su3")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.FormatInt(int64(len(su3)), 10))
 
-	io.Copy(w, bytes.NewReader(su3.Bytes()))
+	io.Copy(w, bytes.NewReader(su3))
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {

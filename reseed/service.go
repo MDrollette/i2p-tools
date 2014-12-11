@@ -2,6 +2,8 @@ package reseed
 
 import (
 	"crypto/rsa"
+	"fmt"
+	"hash/crc32"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -10,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/MDrollette/go-i2p/su3"
 )
@@ -29,18 +32,108 @@ type Reseeder interface {
 	Peer(r *http.Request) Peer
 	// create an Su3 file from the given seeds
 	CreateSu3(seeds Seeds) (*su3.Su3File, error)
+	// get signed su3 bytes for a peer
+	PeerSu3Bytes(peer Peer) ([]byte, error)
 }
 
 type ReseederImpl struct {
-	netdb      NetDbProvider
-	SigningKey *rsa.PrivateKey
-	SignerId   []byte
+	netdb NetDbProvider
+	su3s  chan [][]byte
+
+	SigningKey      *rsa.PrivateKey
+	SignerId        []byte
+	NumRi           int
+	RebuildInterval time.Duration
+	numSu3          int
 }
 
 func NewReseeder(netdb NetDbProvider) *ReseederImpl {
 	return &ReseederImpl{
-		netdb: netdb,
+		netdb:           netdb,
+		su3s:            make(chan [][]byte),
+		NumRi:           50,
+		RebuildInterval: 12 * time.Hour,
+		numSu3:          50,
 	}
+}
+
+func (rs *ReseederImpl) Start() chan bool {
+	// atomic swapper
+	go func() {
+		var m [][]byte
+		for {
+			select {
+			case m = <-rs.su3s:
+			case rs.su3s <- m:
+			}
+		}
+	}()
+
+	// init the cache
+	err := rs.rebuild()
+	if nil != err {
+		log.Println(err)
+	}
+
+	ticker := time.NewTicker(rs.RebuildInterval)
+	quit := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				err := rs.rebuild()
+				if nil != err {
+					log.Println(err)
+				}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	return quit
+}
+
+func (rs *ReseederImpl) rebuild() error {
+	log.Println("Rebuilding SU3s...")
+	ris, err := rs.netdb.RouterInfos()
+	if nil != err {
+		return fmt.Errorf("Unable to get routerInfos: %s", err)
+	}
+
+	if rs.NumRi > len(ris) {
+		return fmt.Errorf("Not enough routerInfos.")
+	}
+
+	newSu3s := make([][]byte, rs.numSu3)
+	for i := 0; i < rs.numSu3; i++ {
+		var seeds Seeds
+		for _, z := range rand.Perm(rs.NumRi) {
+			seeds = append(seeds, ris[z])
+		}
+
+		gs, err := rs.CreateSu3(seeds)
+		if nil != err {
+			return err
+		}
+
+		newSu3s[i] = gs.Bytes()
+	}
+
+	rs.su3s <- newSu3s
+	log.Println("Done rebuilding.")
+
+	return nil
+}
+
+func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
+	hashMod := int(crc32.ChecksumIEEE([]byte(peer))) % rs.numSu3
+
+	m := <-rs.su3s
+	defer func() { rs.su3s <- m }()
+
+	return m[hashMod], nil
 }
 
 func (rs *ReseederImpl) Seeds(p Peer) (Seeds, error) {

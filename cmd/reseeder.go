@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"runtime"
+	"time"
 
 	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/codegangsta/cli"
@@ -39,6 +41,16 @@ func NewReseedCommand() cli.Command {
 				Value: "reseed_private.pem",
 				Usage: "Path to your su3 signing private key",
 			},
+			cli.IntFlag{
+				Name:  "numRi",
+				Value: 50,
+				Usage: "Number of routerInfos to include in each SU3 file",
+			},
+			cli.StringFlag{
+				Name:  "interval",
+				Value: "12h",
+				Usage: "Duration between SU3 cache rebuilds (ex. 12h, 15m)",
+			},
 		},
 	}
 }
@@ -48,6 +60,11 @@ func reseedAction(c *cli.Context) {
 	if netdbDir == "" {
 		fmt.Println("--netdb is required")
 		return
+	}
+
+	cpus := runtime.NumCPU()
+	if cpus >= 4 {
+		runtime.GOMAXPROCS(cpus / 2)
 	}
 
 	// load our signing privKey
@@ -60,9 +77,17 @@ func reseedAction(c *cli.Context) {
 	netdb := reseed.NewLocalNetDb(netdbDir)
 
 	// create a reseeder
+	intr, err := time.ParseDuration(c.String("interval"))
+	if nil != err {
+		log.Fatalf("'%s' is not a valid time duration\n", intr)
+	}
+
 	reseeder := reseed.NewReseeder(netdb)
 	reseeder.SigningKey = privKey
 	reseeder.SignerId = []byte("matt@drollette.com")
+	reseeder.NumRi = c.Int("numRI")
+	reseeder.RebuildInterval = intr
+	reseeder.Start()
 
 	// create a server
 	server := reseed.NewServer()
