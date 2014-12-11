@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -16,12 +17,12 @@ func NewSu3Command() cli.Command {
 		Action:      su3Action,
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "netdb",
-				Usage: "Path to NetDB directory containing routerInfos",
+				Name:  "signer",
+				Usage: "Your SU3 signing ID (your email address)",
 			},
 			cli.StringFlag{
-				Name:  "signer",
-				Usage: "Your email address or su3 signing ID",
+				Name:  "netdb",
+				Usage: "Path to NetDB directory containing routerInfos",
 			},
 			cli.StringFlag{
 				Name:  "keyfile",
@@ -33,20 +34,31 @@ func NewSu3Command() cli.Command {
 }
 
 func su3Action(c *cli.Context) {
+	netdbDir := c.String("netdb")
+	if netdbDir == "" {
+		fmt.Println("--netdb is required")
+		return
+	}
+
+	signerId := c.String("signer")
+	if signerId == "" {
+		fmt.Println("--signer is required")
+		return
+	}
+
 	// load our signing privKey
 	privKey, err := loadPrivateKey(c.String("keyfile"))
 	if nil != err {
 		log.Fatalln(err)
 	}
 
-	netdb := reseed.NewLocalNetDb(c.String("netdb"))
+	netdb := reseed.NewLocalNetDb(netdbDir)
 	reseeder := reseed.NewReseeder(netdb)
-	reseeder.SignerId = []byte(c.String("signer"))
+	reseeder.SignerId = []byte(signerId)
 	reseeder.SigningKey = privKey
 
 	// make a fake peer
-	peer := reseed.Peer("127.0.0.1")
-	seeds, err := reseeder.Seeds(peer)
+	seeds, err := reseeder.Seeds(reseed.Peer("127.0.0.1"))
 	if nil != err {
 		log.Fatalln(err)
 		return

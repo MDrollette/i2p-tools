@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net"
 	"runtime"
 	"time"
 
@@ -18,13 +19,22 @@ func NewReseedCommand() cli.Command {
 		Action:      reseedAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "addr",
-				Value: "127.0.0.1:9090",
-				Usage: "IP and port to listen on",
+				Name:  "signer",
+				Usage: "Your SU3 signing ID (your email address)",
 			},
 			cli.StringFlag{
 				Name:  "netdb",
 				Usage: "Path to NetDB directory containing routerInfos",
+			},
+			cli.StringFlag{
+				Name:  "ip",
+				Value: "0.0.0.0",
+				Usage: "IP address to listen on",
+			},
+			cli.StringFlag{
+				Name:  "port",
+				Value: "9090",
+				Usage: "Port to listen on",
 			},
 			cli.StringFlag{
 				Name:  "tlscert",
@@ -35,10 +45,6 @@ func NewReseedCommand() cli.Command {
 				Name:  "tlskey",
 				Value: "key.pem",
 				Usage: "Path to tls key",
-			},
-			cli.StringFlag{
-				Name:  "signer",
-				Usage: "Your email address or su3 signing ID",
 			},
 			cli.StringFlag{
 				Name:  "keyfile",
@@ -66,12 +72,25 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
+	signerId := c.String("signer")
+	if signerId == "" {
+		fmt.Println("--signer is required")
+		return
+	}
+
+	reloadIntvl, err := time.ParseDuration(c.String("interval"))
+	if nil != err {
+		log.Fatalf("'%s' is not a valid time interval.\n", reloadIntvl)
+	}
+
+	// use at most half of the cores
 	cpus := runtime.NumCPU()
 	if cpus >= 4 {
 		runtime.GOMAXPROCS(cpus / 2)
 	}
 
 	// load our signing privKey
+	// @todo: generate a new signing key if one doesn't exist
 	privKey, err := loadPrivateKey(c.String("keyfile"))
 	if nil != err {
 		log.Fatalln(err)
@@ -81,24 +100,19 @@ func reseedAction(c *cli.Context) {
 	netdb := reseed.NewLocalNetDb(netdbDir)
 
 	// create a reseeder
-	intr, err := time.ParseDuration(c.String("interval"))
-	if nil != err {
-		log.Fatalf("'%s' is not a valid time duration\n", intr)
-	}
-
 	reseeder := reseed.NewReseeder(netdb)
 	reseeder.SigningKey = privKey
-	reseeder.SignerId = []byte(c.String("signer"))
+	reseeder.SignerId = []byte(signerId)
 	reseeder.NumRi = c.Int("numRI")
-	reseeder.RebuildInterval = intr
+	reseeder.RebuildInterval = reloadIntvl
 	reseeder.Start()
 
 	// create a server
 	server := reseed.NewServer()
 	server.Reseeder = reseeder
-	server.Addr = c.String("addr")
+	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
-	// @todo generate self-signed keys if they don't exist
+	// @todo check if tls cert exists, prompt to generate a new one if not
 
 	log.Printf("Server listening on %s\n", server.Addr)
 	server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey"))

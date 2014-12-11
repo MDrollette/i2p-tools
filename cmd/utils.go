@@ -12,6 +12,7 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	if nil != err {
 		return nil, err
 	}
+
 	privDer, _ := pem.Decode(privPem)
 	privKey, err := x509.ParsePKCS1PrivateKey(privDer.Bytes)
 	if nil != err {

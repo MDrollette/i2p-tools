@@ -14,7 +14,7 @@ import (
 
 func NewSu3VerifyPublicCommand() cli.Command {
 	return cli.Command{
-		Name:        "vp",
+		Name:        "check_all",
 		Usage:       "Verify all publicly listed reseed servers",
 		Description: "Verify all publicly listed reseed servers",
 		Action:      su3VerifyPublicAction,
@@ -38,16 +38,16 @@ func su3VerifyPublicAction(c *cli.Context) {
 		"https://ieb9oopo.mooo.com/",
 	}
 
-	pipe := make(chan *http.Response)
+	responses := make(chan *http.Response)
 
 	// Kick off goroutines to download the URLs
-	go download(pipe, public_servers)
+	go download(responses, public_servers)
 
 	// Process them serially
-	validate(pipe)
+	validate(responses)
 }
 
-func download(out chan *http.Response, urls []string) {
+func download(responses chan *http.Response, urls []string) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -68,18 +68,19 @@ func download(out chan *http.Response, urls []string) {
 				log.Fatalln(err)
 			}
 
-			out <- resp
+			responses <- resp
 		}(url)
 	}
 
+	// wait for all the responses to be handled
 	wg.Wait()
-	close(out)
+	close(responses)
 }
 
-func validate(in chan *http.Response) {
+func validate(responses chan *http.Response) {
 	ks := reseed.KeyStore{Path: "./certificates"}
 
-	for resp := range in {
+	for resp := range responses {
 		fmt.Printf("Validating: %s\n", resp.Request.URL)
 
 		if resp.StatusCode != 200 {

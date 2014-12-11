@@ -147,9 +147,10 @@ func (s *Su3File) BodyBytes() []byte {
 
 func (s *Su3File) Bytes() []byte {
 	buf := new(bytes.Buffer)
-	buf.Write(s.BodyBytes())
 
-	// xx+ Signature, length specified in header, covers everything starting at byte 0
+	// write the body
+	buf.Write(s.BodyBytes())
+	// append the signature
 	binary.Write(buf, binary.BigEndian, s.Signature)
 
 	return buf.Bytes()

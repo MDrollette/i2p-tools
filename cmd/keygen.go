@@ -24,17 +24,18 @@ func NewKeygenCommand() cli.Command {
 		Action:      keygenAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "email",
-				Usage: "Your email address (ex. something@mail.i2p)",
+				Name:  "signer",
+				Usage: "Your SU3 signing ID (your email address)",
 			},
 		},
 	}
 }
 
 func keygenAction(c *cli.Context) {
-	signer := c.String("email")
-	if signer == "" {
-		log.Fatalln("You must specify an email address (ex. --email=something@mail.i2p)")
+	signerId := c.String("signer")
+	if signerId == "" {
+		fmt.Println("--signer is required")
+		return
 	}
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -46,7 +47,7 @@ func keygenAction(c *cli.Context) {
 	template := &x509.Certificate{
 		BasicConstraintsValid: true,
 		IsCA:         true,
-		SubjectKeyId: []byte(signer),
+		SubjectKeyId: []byte(signerId),
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization:       []string{"I2P Anonymous Network"},
@@ -54,7 +55,7 @@ func keygenAction(c *cli.Context) {
 			Locality:           []string{"XX"},
 			StreetAddress:      []string{"XX"},
 			Country:            []string{"XX"},
-			CommonName:         signer,
+			CommonName:         signerId,
 		},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().AddDate(10, 0, 0),
@@ -91,7 +92,7 @@ func keygenAction(c *cli.Context) {
 	fmt.Println("private key saved to reseed_private.pem")
 
 	// save cert
-	filename := reseed.SignerFilename(signer)
+	filename := reseed.SignerFilename(signerId)
 	certOut, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("failed to open %s for writing: %s", filename, err)
