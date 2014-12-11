@@ -10,7 +10,7 @@ import (
 
 func signerCertificate(signer string) (*x509.Certificate, error) {
 	certFile := filepath.Base(signerFilename(signer))
-	certString, err := ioutil.ReadFile(filepath.Join("./certificates", certFile))
+	certString, err := ioutil.ReadFile(filepath.Join("./certificates/reseed", certFile))
 	if nil != err {
 		return nil, err
 	}
