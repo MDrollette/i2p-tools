@@ -38,12 +38,10 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "tlscert",
-				Value: "cert.pem",
 				Usage: "Path to tls certificate",
 			},
 			cli.StringFlag{
 				Name:  "tlskey",
-				Value: "key.pem",
 				Usage: "Path to tls key",
 			},
 			cli.StringFlag{
@@ -60,6 +58,14 @@ func NewReseedCommand() cli.Command {
 				Name:  "interval",
 				Value: "12h",
 				Usage: "Duration between SU3 cache rebuilds (ex. 12h, 15m)",
+			},
+			cli.StringFlag{
+				Name:  "prefix",
+				Usage: "Prefix path for server. (ex. /netdb)",
+			},
+			cli.BoolFlag{
+				Name:  "trustProxy",
+				Usage: "If provided, we will trust the 'X-Forwarded-For' header in requests (ex. behind cloudflare)",
 			},
 		},
 	}
@@ -103,17 +109,22 @@ func reseedAction(c *cli.Context) {
 	reseeder := reseed.NewReseeder(netdb)
 	reseeder.SigningKey = privKey
 	reseeder.SignerId = []byte(signerId)
-	reseeder.NumRi = c.Int("numRI")
+	reseeder.NumRi = c.Int("numRi")
 	reseeder.RebuildInterval = reloadIntvl
 	reseeder.Start()
 
 	// create a server
-	server := reseed.NewServer()
+	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
 	// @todo check if tls cert exists, prompt to generate a new one if not
 
 	log.Printf("Server listening on %s\n", server.Addr)
-	server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey"))
+
+	if c.String("tlscert") != "" && c.String("tlskey") != "" {
+		log.Fatalln(server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey")))
+	} else {
+		log.Fatalln(server.ListenAndServe())
+	}
 }

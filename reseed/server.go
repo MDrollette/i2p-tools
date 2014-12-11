@@ -23,17 +23,21 @@ type Server struct {
 	Reseeder Reseeder
 }
 
-func NewServer() *Server {
+func NewServer(prefix string, trustProxy bool) *Server {
 	config := &tls.Config{MinVersion: tls.VersionTLS10}
 	h := &http.Server{TLSConfig: config}
 	server := Server{h, nil}
 
 	th := throttled.RateLimit(throttled.PerHour(120), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(10000))
 
-	middlewareChain := alice.New(proxiedMiddleware, loggingMiddleware, verifyMiddleware, th.Throttle)
+	middlewareChain := alice.New()
+	if trustProxy {
+		middlewareChain.Append(proxiedMiddleware)
+	}
+	middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle)
 
 	mux := http.NewServeMux()
-	mux.Handle("/i2pseeds.su3", middlewareChain.Then(http.HandlerFunc(server.reseedHandler)))
+	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Then(http.HandlerFunc(server.reseedHandler)))
 	server.Handler = mux
 
 	return &server
