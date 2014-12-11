@@ -53,12 +53,10 @@ type Su3File struct {
 }
 
 func NewSu3File() *Su3File {
-	s := Su3File{
+	return &Su3File{
 		Version:       []byte(strconv.FormatInt(time.Now().Unix(), 10)),
 		SignatureType: SIGTYPE_RSA_SHA512,
 	}
-
-	return &s
 }
 
 func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
@@ -73,7 +71,7 @@ func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
 	case SIGTYPE_ECDSA_SHA512, SIGTYPE_RSA_SHA512:
 		hashType = crypto.SHA512
 	default:
-		return fmt.Errorf("Unknown signature type")
+		return fmt.Errorf("Unknown signature type.")
 	}
 
 	h := hashType.New()
@@ -91,9 +89,9 @@ func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
 }
 
 func (s *Su3File) BodyBytes() []byte {
-	buf := new(bytes.Buffer)
-
 	var (
+		buf = new(bytes.Buffer)
+
 		skip    [1]byte
 		bigSkip [12]byte
 
@@ -103,6 +101,7 @@ func (s *Su3File) BodyBytes() []byte {
 		contentLength   = uint64(len(s.Content))
 	)
 
+	// determine sig length based on type
 	switch s.SignatureType {
 	case SIGTYPE_DSA:
 		signatureLength = uint16(40)
@@ -145,10 +144,8 @@ func (s *Su3File) BodyBytes() []byte {
 }
 
 func (s *Su3File) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
+	buf := bytes.NewBuffer(s.BodyBytes())
 
-	// write the body
-	buf.Write(s.BodyBytes())
 	// append the signature
 	binary.Write(buf, binary.BigEndian, s.Signature)
 
@@ -216,7 +213,7 @@ func (s *Su3File) VerifySignature(cert *x509.Certificate) error {
 	case SIGTYPE_RSA_SHA512:
 		sigAlg = x509.SHA512WithRSA
 	default:
-		return fmt.Errorf("Unsupported signature type.")
+		return fmt.Errorf("Unknown signature type.")
 	}
 
 	return checkSignature(cert, sigAlg, s.BodyBytes(), s.Signature)
