@@ -37,6 +37,10 @@ func NewReseedCommand() cli.Command {
 				Usage: "Path to tls key",
 			},
 			cli.StringFlag{
+				Name:  "signer",
+				Usage: "Your email address or su3 signing ID",
+			},
+			cli.StringFlag{
 				Name:  "keyfile",
 				Value: "reseed_private.pem",
 				Usage: "Path to your su3 signing private key",
@@ -84,7 +88,7 @@ func reseedAction(c *cli.Context) {
 
 	reseeder := reseed.NewReseeder(netdb)
 	reseeder.SigningKey = privKey
-	reseeder.SignerId = []byte("matt@drollette.com")
+	reseeder.SignerId = []byte(c.String("signer"))
 	reseeder.NumRi = c.Int("numRI")
 	reseeder.RebuildInterval = intr
 	reseeder.Start()
