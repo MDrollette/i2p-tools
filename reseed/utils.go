@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"io/ioutil"
+	"time"
 )
 
 func zipSeeds(seeds Seeds) ([]byte, error) {
@@ -15,10 +16,13 @@ func zipSeeds(seeds Seeds) ([]byte, error) {
 
 	// Add some files to the archive.
 	for _, file := range seeds {
-		zipFile, err := zipWriter.Create(file.Name)
+		fileHeader := &zip.FileHeader{Name: file.Name}
+		fileHeader.SetModTime(time.Now().UTC())
+		zipFile, err := zipWriter.CreateHeader(fileHeader)
 		if err != nil {
 			return nil, err
 		}
+
 		_, err = zipFile.Write(file.Data)
 		if err != nil {
 			return nil, err

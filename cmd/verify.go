@@ -15,7 +15,12 @@ func NewSu3VerifyCommand() cli.Command {
 		Usage:       "Verify a Su3 file",
 		Description: "Verify a Su3 file",
 		Action:      su3VerifyAction,
-		Flags:       []cli.Flag{},
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:  "extract",
+				Usage: "Also extract the contents of the su3",
+			},
+		},
 	}
 }
 
@@ -44,4 +49,9 @@ func su3VerifyAction(c *cli.Context) {
 	}
 
 	fmt.Printf("Signature is valid for signer '%s'\n", su3File.SignerId)
+
+	if c.Bool("extract") {
+		// @todo: don't assume zip
+		ioutil.WriteFile("extracted.zip", su3File.BodyBytes(), 0755)
+	}
 }
