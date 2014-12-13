@@ -2,12 +2,12 @@ package reseed
 
 import (
 	"crypto/rsa"
+	"crypto/sha256"
 	"fmt"
 	"hash/crc32"
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +23,14 @@ type routerInfo struct {
 }
 
 type Peer string
+
+func (p Peer) Hash() int {
+	b := sha256.Sum256([]byte(p))
+	c := make([]byte, len(b))
+	copy(c, b[:])
+	return int(crc32.ChecksumIEEE(c))
+}
+
 type Seeds []routerInfo
 
 type Reseeder interface {
@@ -96,7 +104,7 @@ func (rs *ReseederImpl) Start() chan bool {
 }
 
 func (rs *ReseederImpl) rebuild() error {
-	log.Println("Rebuilding SU3s...")
+	log.Println("Rebuilding su3s...")
 	ris, err := rs.netdb.RouterInfos()
 	if nil != err {
 		return fmt.Errorf("Unable to get routerInfos: %s", err)
@@ -133,7 +141,7 @@ func (rs *ReseederImpl) rebuild() error {
 }
 
 func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
-	hashMod := int(crc32.ChecksumIEEE([]byte(peer))) % rs.numSu3
+	hashMod := peer.Hash() % rs.numSu3
 
 	m := <-rs.su3s
 	defer func() { rs.su3s <- m }()
@@ -151,8 +159,7 @@ func (rs *ReseederImpl) Seeds(p Peer) (Seeds, error) {
 }
 
 func (rs *ReseederImpl) Peer(r *http.Request) Peer {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return Peer(ip)
+	return Peer(r.RemoteAddr)
 }
 
 func (rs *ReseederImpl) CreateSu3(seeds Seeds) (*su3.Su3File, error) {
