@@ -195,33 +195,29 @@ func NewLocalNetDb(path string) *LocalNetDbImpl {
 }
 
 func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
-	var src []os.FileInfo
-	if src, err = ioutil.ReadDir(db.Path); nil != err {
-		return
-	}
-
-	// randomize the file order
-	files := make([]os.FileInfo, len(src))
-	perm := rand.Perm(len(src))
-	for i, v := range perm {
-		files[v] = src[i]
-	}
-
 	r, _ := regexp.Compile("^routerInfo-[A-Za-z0-9-=~]+.dat$")
 
-	for _, file := range files {
-		if r.MatchString(file.Name()) {
-			riBytes, err := ioutil.ReadFile(filepath.Join(db.Path, file.Name()))
-			if nil != err {
-				log.Println(err)
-				continue
-			}
-
-			routerInfos = append(routerInfos, routerInfo{
-				Name: file.Name(),
-				Data: riBytes,
-			})
+	files := make(map[string]os.FileInfo)
+	walkpath := func(path string, f os.FileInfo, err error) error {
+		if r.MatchString(f.Name()) {
+			files[path] = f
 		}
+		return nil
+	}
+
+	filepath.Walk(db.Path, walkpath)
+
+	for path, file := range files {
+		riBytes, err := ioutil.ReadFile(path)
+		if nil != err {
+			log.Println(err)
+			continue
+		}
+
+		routerInfos = append(routerInfos, routerInfo{
+			Name: file.Name(),
+			Data: riBytes,
+		})
 	}
 
 	return
