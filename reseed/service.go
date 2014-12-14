@@ -112,6 +112,9 @@ func (rs *ReseederImpl) rebuild() error {
 		return fmt.Errorf("Unable to get routerInfos: %s", err)
 	}
 
+	// use only 75% of routerInfos
+	ris = ris[len(ris)/4:]
+
 	// fail if we don't have enough RIs to make a single reseed file
 	if rs.NumRi > len(ris) {
 		return fmt.Errorf("Not enough routerInfos.")
@@ -163,7 +166,6 @@ func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan Seeds {
 		}
 	}
 
-	// @todo: only use a portion of available RIs
 	log.Printf("Building %d su3 files each containing %d out of %d routerInfos.\n", numSu3s, rs.NumRi, lenRis)
 
 	out := make(chan Seeds)
