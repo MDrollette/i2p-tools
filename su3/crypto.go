@@ -4,11 +4,14 @@ import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"math/big"
+	"time"
 )
 
 type dsaSignature struct {
@@ -71,4 +74,42 @@ func checkSignature(c *x509.Certificate, algo x509.SignatureAlgorithm, signed, s
 		return
 	}
 	return x509.ErrUnsupportedAlgorithm
+}
+
+func NewSigningCertificate(signerId string, privateKey *rsa.PrivateKey) ([]byte, error) {
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	template := &x509.Certificate{
+		BasicConstraintsValid: true,
+		IsCA:         true,
+		SubjectKeyId: []byte(signerId),
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization:       []string{"I2P Anonymous Network"},
+			OrganizationalUnit: []string{"I2P"},
+			Locality:           []string{"XX"},
+			StreetAddress:      []string{"XX"},
+			Country:            []string{"XX"},
+			CommonName:         signerId,
+		},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().AddDate(10, 0, 0),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+	}
+
+	publicKey := &privateKey.PublicKey
+
+	// create a self-signed certificate. template = parent
+	var parent = template
+	cert, err := x509.CreateCertificate(rand.Reader, template, parent, publicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
 }

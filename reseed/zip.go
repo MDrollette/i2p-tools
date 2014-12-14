@@ -16,7 +16,7 @@ func zipSeeds(seeds Seeds) ([]byte, error) {
 
 	// Add some files to the archive.
 	for _, file := range seeds {
-		fileHeader := &zip.FileHeader{Name: file.Name}
+		fileHeader := &zip.FileHeader{Name: file.Name, Method: zip.Deflate}
 		fileHeader.SetModTime(time.Now().UTC())
 		zipFile, err := zipWriter.CreateHeader(fileHeader)
 		if err != nil {

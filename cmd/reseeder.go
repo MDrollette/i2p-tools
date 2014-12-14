@@ -13,14 +13,13 @@ import (
 
 func NewReseedCommand() cli.Command {
 	return cli.Command{
-		Name:        "reseed",
-		Usage:       "Start a reseed server",
-		Description: "Start a reseed server",
-		Action:      reseedAction,
+		Name:   "reseed",
+		Usage:  "Start a reseed server",
+		Action: reseedAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "signer",
-				Usage: "Your SU3 signing ID (your email address)",
+				Usage: "Your su3 signing ID (ex. something@mail.i2p)",
 			},
 			cli.StringFlag{
 				Name:  "netdb",
@@ -76,6 +75,7 @@ func NewReseedCommand() cli.Command {
 }
 
 func reseedAction(c *cli.Context) {
+	// validate flags
 	netdbDir := c.String("netdb")
 	if netdbDir == "" {
 		fmt.Println("--netdb is required")
@@ -93,13 +93,12 @@ func reseedAction(c *cli.Context) {
 		log.Fatalf("'%s' is not a valid time interval.\n", reloadIntvl)
 	}
 
-	// use at most half of the cores
+	// use all cores
 	cpus := runtime.NumCPU()
 	runtime.GOMAXPROCS(cpus)
 	log.Printf("Using %d CPU cores.\n", cpus)
 
 	// load our signing privKey
-	// @todo: generate a new signing key if one doesn't exist
 	privKey, err := loadPrivateKey(c.String("keyfile"))
 	if nil != err {
 		log.Fatalln(err)

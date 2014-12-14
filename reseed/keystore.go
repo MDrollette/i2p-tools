@@ -24,5 +24,5 @@ func (ks *KeyStore) ReseederCertificate(signer []byte) (*x509.Certificate, error
 }
 
 func SignerFilename(signer string) string {
-	return strings.Replace(signer, "@", "_at_", 2) + ".crt"
+	return strings.Replace(signer, "@", "_at_", 1) + ".crt"
 }

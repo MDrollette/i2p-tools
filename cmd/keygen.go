@@ -4,28 +4,29 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"log"
-	"math/big"
-	"os"
-	"time"
+	"strings"
 
-	"github.com/MDrollette/go-i2p/reseed"
+	"github.com/MDrollette/go-i2p/su3"
 	"github.com/codegangsta/cli"
 )
 
 func NewKeygenCommand() cli.Command {
 	return cli.Command{
-		Name:        "keygen",
-		Usage:       "Generate keys for reseed SU3 signing",
-		Description: "Generate keys for reseed SU3 signing",
-		Action:      keygenAction,
+		Name:   "keygen",
+		Usage:  "Generate keys for reseed su3 signing and TLS serving.",
+		Action: keygenAction,
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "signer",
-				Usage: "Your SU3 signing ID (your email address)",
+				Usage: "Your su3 signing ID (ex. something@mail.i2p)",
+			},
+			cli.StringFlag{
+				Name:  "host",
+				Usage: "Hostname to use for self-signed TLS certificate",
 			},
 		},
 	}
@@ -38,66 +39,26 @@ func keygenAction(c *cli.Context) {
 		return
 	}
 
-	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
-	if err != nil {
-		log.Fatalf("failed to generate serial number: %s", err)
-	}
-
-	template := &x509.Certificate{
-		BasicConstraintsValid: true,
-		IsCA:         true,
-		SubjectKeyId: []byte(signerId),
-		SerialNumber: serialNumber,
-		Subject: pkix.Name{
-			Organization:       []string{"I2P Anonymous Network"},
-			OrganizationalUnit: []string{"I2P"},
-			Locality:           []string{"XX"},
-			StreetAddress:      []string{"XX"},
-			Country:            []string{"XX"},
-			CommonName:         signerId,
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().AddDate(10, 0, 0),
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-	}
-
 	// generate private key
 	fmt.Println("Generating keys. This may take a moment...")
-	privatekey, err := rsa.GenerateKey(rand.Reader, 4096)
+	signerKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	publickey := &privatekey.PublicKey
-
-	// create a self-signed certificate. template = parent
-	var parent = template
-	cert, err := x509.CreateCertificate(rand.Reader, template, parent, publickey, privatekey)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	signerCert, err := su3.NewSigningCertificate(signerId, signerKey)
 
 	// save private key
-	pemfile, err := os.Create("reseed_private.pem")
-	if err != nil {
-		log.Fatalf("failed to open reseed_cert.pem for writing: %s", err)
+	privFile := strings.Replace(signerId, "@", "_at_", 1) + ".pem"
+	if ioutil.WriteFile(privFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(signerKey)}), 0600); err != nil {
+		log.Fatalln(err)
 	}
-	var pemkey = &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privatekey)}
-	pem.Encode(pemfile, pemkey)
-	pemfile.Close()
-	fmt.Println("private key saved to reseed_private.pem")
+	fmt.Println("private key saved to:", privFile)
 
 	// save cert
-	filename := reseed.SignerFilename(signerId)
-	certOut, err := os.Create(filename)
-	if err != nil {
-		log.Fatalf("failed to open %s for writing: %s", filename, err)
+	certFile := strings.Replace(signerId, "@", "_at_", 1) + ".crt"
+	if ioutil.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: signerCert}), 0755); err != nil {
+		log.Fatalln(err)
 	}
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: cert})
-	certOut.Close()
-	fmt.Println("certificate saved to", filename)
+	fmt.Println("certificate saved to", certFile)
 }

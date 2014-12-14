@@ -9,7 +9,7 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "i2p"
+	app.Name = "go-i2p"
 	app.Version = "0.1.0"
 	app.Usage = "I2P commands"
 	app.Flags = []cli.Flag{}
