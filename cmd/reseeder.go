@@ -32,19 +32,19 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "port",
-				Value: "9090",
+				Value: "8080",
 				Usage: "Port to listen on",
 			},
 			cli.StringFlag{
-				Name:  "tlscert",
-				Usage: "Path to tls certificate",
+				Name:  "tlsCert",
+				Usage: "Path to TLS certificate",
 			},
 			cli.StringFlag{
-				Name:  "tlskey",
-				Usage: "Path to tls key",
+				Name:  "tlsKey",
+				Usage: "Path to TLS private key",
 			},
 			cli.StringFlag{
-				Name:  "keyfile",
+				Name:  "keyFile",
 				Value: "reseed_private.pem",
 				Usage: "Path to your su3 signing private key",
 			},
@@ -64,7 +64,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "prefix",
-				Usage: "Prefix path for server. (ex. /netdb)",
+				Usage: "Prefix path for the HTTP(S) server. (ex. /netdb)",
 			},
 			cli.BoolFlag{
 				Name:  "trustProxy",
@@ -125,7 +125,7 @@ func reseedAction(c *cli.Context) {
 
 	log.Printf("Server listening on %s\n", server.Addr)
 
-	if c.String("tlscert") != "" && c.String("tlskey") != "" {
+	if c.String("tlsCert") != "" && c.String("tlsKey") != "" {
 		log.Fatalln(server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey")))
 	} else {
 		log.Fatalln(server.ListenAndServe())
