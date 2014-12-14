@@ -52,7 +52,11 @@ func NewReseedCommand() cli.Command {
 			cli.IntFlag{
 				Name:  "numRi",
 				Value: 75,
-				Usage: "Number of routerInfos to include in each SU3 file",
+				Usage: "Number of routerInfos to include in each su3 file",
+			},
+			cli.IntFlag{
+				Name:  "numSu3",
+				Usage: "Number of su3 files to build",
 			},
 			cli.StringFlag{
 				Name:  "interval",
@@ -91,9 +95,8 @@ func reseedAction(c *cli.Context) {
 
 	// use at most half of the cores
 	cpus := runtime.NumCPU()
-	if cpus >= 4 {
-		runtime.GOMAXPROCS(cpus / 2)
-	}
+	runtime.GOMAXPROCS(cpus)
+	log.Printf("Using %d CPU cores.\n", cpus)
 
 	// load our signing privKey
 	// @todo: generate a new signing key if one doesn't exist
@@ -110,6 +113,7 @@ func reseedAction(c *cli.Context) {
 	reseeder.SigningKey = privKey
 	reseeder.SignerId = []byte(signerId)
 	reseeder.NumRi = c.Int("numRi")
+	reseeder.NumSu3 = c.Int("numSu3")
 	reseeder.RebuildInterval = reloadIntvl
 	reseeder.Start()
 
