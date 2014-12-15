@@ -14,15 +14,15 @@ $ i2p-tools -h
 ...
 ```
 
-Otherwise, a binary for your OS can be download from http://matt.i2p/
+Otherwise, a binary for your OS can be downloaded from http://matt.i2p/
 
 ## Usage
 
 If this is your first time running a reseed server (ie. you don't have any existing keys). You can simply run the following command and follow the prompts to create the appropriate keys and certificates.
 
 ```
-$ i2p-tools --signer=youremail@mail.i2p --tlsHost=your-server-name.tld --netdb=/var/lib/i2p/i2p-config/netDb
+$ i2p-tools reseed --signer=you@mail.i2p --tlsHost=your-domain.tld --netdb=/var/lib/i2p/i2p-config/netDb
 ...
 ```
 
-This will  start an HTTPS reseed server on the default port and generate 4 files in your current directory (a TLS key and certificate, and a signing key and certificate). Both of the certificates (*.crt) will need to be sent to the I2P developers in order for your reseed server to be included in the standard I2P package.
+This will start an HTTPS reseed server on the default port and generate 4 files in your current directory (a TLS key and certificate, and a signing key and certificate). Both of the certificates (*.crt) will need to be sent to the I2P developers in order for your reseed server to be included in the standard I2P package.
