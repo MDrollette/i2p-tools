@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -93,6 +95,9 @@ func createSigningCertificate(signerId string) error {
 	}
 
 	signerCert, err := su3.NewSigningCertificate(signerId, signerKey)
+	if nil != err {
+		return err
+	}
 
 	// save cert
 	certFile := signerFile(signerId) + ".crt"
@@ -119,12 +124,15 @@ func createSigningCertificate(signerId string) error {
 
 func createTLSCertificate(host string) error {
 	fmt.Println("Generating TLS keys. This may take a minute...")
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("failed to generate TLS private key:", err)
 	}
 
 	tlsCert, err := reseed.NewTLSCertificate(host, priv)
+	if nil != err {
+		return err
+	}
 
 	// save the TLS certificate
 	certOut, err := os.Create(host + ".crt")
@@ -140,7 +148,11 @@ func createTLSCertificate(host string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open %s for writing: %s", host+".pem", err)
 	}
-	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	derBytes, err := x509.MarshalECPrivateKey(priv)
+	if nil != err {
+		return err
+	}
+	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: derBytes})
 	keyOut.Close()
 	fmt.Printf("TLS private key saved to: %s\n", host+".pem")
 
