@@ -8,9 +8,9 @@ This tool provides a secure and efficient reseed server for the I2P network. The
 If you have Go installed you can download, build, and install this tool with `go get`
 
 ```
-$ go get github.com/MDrollette/go-i2p
+$ go get github.com/MDrollette/i2p-tools
 ...
-$ go-i2p -h
+$ i2p-tools -h
 ...
 ```
 
@@ -21,7 +21,7 @@ Otherwise, a binary for your OS can be download from http://matt.i2p/
 If this is your first time running a reseed server (ie. you don't have any existing keys). You can simply run the following command and follow the prompts to create the appropriate keys and certificates.
 
 ```
-$ go-i2p --signer=youremail@mail.i2p --tlsHost=your-server-name.tld --netdb=/var/lib/i2p/i2p-config/netDb
+$ i2p-tools --signer=youremail@mail.i2p --tlsHost=your-server-name.tld --netdb=/var/lib/i2p/i2p-config/netDb
 ...
 ```
 

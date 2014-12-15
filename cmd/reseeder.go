@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/MDrollette/go-i2p/reseed"
+	"github.com/MDrollette/i2p-tools/reseed"
 	"github.com/codegangsta/cli"
 )
 

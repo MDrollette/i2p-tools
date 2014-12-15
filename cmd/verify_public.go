@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/MDrollette/go-i2p/reseed"
-	"github.com/MDrollette/go-i2p/su3"
+	"github.com/MDrollette/i2p-tools/reseed"
+	"github.com/MDrollette/i2p-tools/su3"
 	"github.com/codegangsta/cli"
 )
 

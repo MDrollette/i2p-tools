@@ -4,7 +4,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/MDrollette/go-i2p/cmd"
+	"github.com/MDrollette/i2p-tools/cmd"
 	"github.com/codegangsta/cli"
 )
 
@@ -13,7 +13,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU() / 2)
 
 	app := cli.NewApp()
-	app.Name = "go-i2p"
+	app.Name = "i2p-tools"
 	app.Version = "0.1.0"
 	app.Usage = "I2P tools and reseed server"
 	app.Author = "Matt Drollette"
