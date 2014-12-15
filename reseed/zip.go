@@ -4,10 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"io/ioutil"
-	"time"
 )
 
-func zipSeeds(seeds Seeds) ([]byte, error) {
+func zipSeeds(seeds []routerInfo) ([]byte, error) {
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
 
@@ -17,7 +16,7 @@ func zipSeeds(seeds Seeds) ([]byte, error) {
 	// Add some files to the archive.
 	for _, file := range seeds {
 		fileHeader := &zip.FileHeader{Name: file.Name, Method: zip.Deflate}
-		fileHeader.SetModTime(time.Now().UTC())
+		fileHeader.SetModTime(file.ModTime)
 		zipFile, err := zipWriter.CreateHeader(fileHeader)
 		if err != nil {
 			return nil, err
@@ -36,14 +35,14 @@ func zipSeeds(seeds Seeds) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func uzipSeeds(c []byte) (Seeds, error) {
+func uzipSeeds(c []byte) ([]routerInfo, error) {
 	input := bytes.NewReader(c)
 	zipReader, err := zip.NewReader(input, int64(len(c)))
 	if nil != err {
 		return nil, err
 	}
 
-	var seeds Seeds
+	var seeds []routerInfo
 	for _, f := range zipReader.File {
 		rc, err := f.Open()
 		if err != nil {

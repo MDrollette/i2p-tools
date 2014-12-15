@@ -41,7 +41,8 @@ func su3VerifyAction(c *cli.Context) {
 	ks := reseed.KeyStore{Path: "./certificates"}
 	cert, err := ks.ReseederCertificate(su3File.SignerId)
 	if nil != err {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
 	if err := su3File.VerifySignature(cert); nil != err {

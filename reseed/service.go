@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,8 +18,9 @@ import (
 )
 
 type routerInfo struct {
-	Name string
-	Data []byte
+	Name    string
+	ModTime time.Time
+	Data    []byte
 }
 
 type Peer string
@@ -32,16 +32,8 @@ func (p Peer) Hash() int {
 	return int(crc32.ChecksumIEEE(c))
 }
 
-type Seeds []routerInfo
-
 type Reseeder interface {
-	// seed a peer with routerinfos
-	Seeds(p Peer) (Seeds, error)
-	// get a peer from a given request
-	Peer(r *http.Request) Peer
-	// create an Su3 file from the given seeds
-	CreateSu3(seeds Seeds) (*su3.Su3File, error)
-	// get signed su3 bytes for a peer
+	// get an su3 file (bytes) for a peer
 	PeerSu3Bytes(peer Peer) ([]byte, error)
 }
 
@@ -144,7 +136,7 @@ func (rs *ReseederImpl) rebuild() error {
 	return nil
 }
 
-func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan Seeds {
+func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan []routerInfo {
 	lenRis := len(ris)
 
 	// if NumSu3 is not specified, then we determine the "best" number based on the number of RIs
@@ -168,11 +160,11 @@ func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan Seeds {
 
 	log.Printf("Building %d su3 files each containing %d out of %d routerInfos.\n", numSu3s, rs.NumRi, lenRis)
 
-	out := make(chan Seeds)
+	out := make(chan []routerInfo)
 
 	go func() {
 		for i := 0; i < numSu3s; i++ {
-			var seeds Seeds
+			var seeds []routerInfo
 			unsorted := rand.Perm(lenRis)
 			for z := 0; z < rs.NumRi; z++ {
 				seeds = append(seeds, ris[unsorted[z]])
@@ -186,11 +178,11 @@ func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan Seeds {
 	return out
 }
 
-func (rs *ReseederImpl) su3Builder(in <-chan Seeds) <-chan *su3.Su3File {
+func (rs *ReseederImpl) su3Builder(in <-chan []routerInfo) <-chan *su3.Su3File {
 	out := make(chan *su3.Su3File)
 	go func() {
 		for seeds := range in {
-			gs, err := rs.CreateSu3(seeds)
+			gs, err := rs.createSu3(seeds)
 			if nil != err {
 				log.Println(err)
 				continue
@@ -210,20 +202,7 @@ func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
 	return m[peer.Hash()%len(m)], nil
 }
 
-func (rs *ReseederImpl) Seeds(p Peer) (Seeds, error) {
-	all, err := rs.netdb.RouterInfos()
-	if nil != err {
-		return nil, err
-	}
-
-	return Seeds(all), nil
-}
-
-func (rs *ReseederImpl) Peer(r *http.Request) Peer {
-	return Peer(r.RemoteAddr)
-}
-
-func (rs *ReseederImpl) CreateSu3(seeds Seeds) (*su3.Su3File, error) {
+func (rs *ReseederImpl) createSu3(seeds []routerInfo) (*su3.Su3File, error) {
 	su3File := su3.NewSu3File()
 	su3File.FileType = su3.FILE_TYPE_ZIP
 	su3File.ContentType = su3.CONTENT_TYPE_RESEED
@@ -276,8 +255,9 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 		}
 
 		routerInfos = append(routerInfos, routerInfo{
-			Name: file.Name(),
-			Data: riBytes,
+			Name:    file.Name(),
+			ModTime: file.ModTime(),
+			Data:    riBytes,
 		})
 	}
 

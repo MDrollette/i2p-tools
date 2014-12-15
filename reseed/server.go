@@ -66,9 +66,9 @@ func NewServer(prefix string, trustProxy bool) *Server {
 }
 
 func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
-	peer := s.Reseeder.Peer(r)
+	peer := Peer(r.RemoteAddr)
 
-	su3, err := s.Reseeder.PeerSu3Bytes(peer)
+	su3Bytes, err := s.Reseeder.PeerSu3Bytes(peer)
 	if nil != err {
 		http.Error(w, "500 Unable to get SU3", http.StatusInternalServerError)
 		return
@@ -76,9 +76,9 @@ func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Disposition", "attachment; filename=i2pseeds.su3")
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Length", strconv.FormatInt(int64(len(su3)), 10))
+	w.Header().Set("Content-Length", strconv.FormatInt(int64(len(su3Bytes)), 10))
 
-	io.Copy(w, bytes.NewReader(su3))
+	io.Copy(w, bytes.NewReader(su3Bytes))
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {
