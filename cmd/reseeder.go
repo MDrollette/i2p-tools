@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
-	"runtime"
 	"time"
 
 	"github.com/MDrollette/go-i2p/reseed"
@@ -23,6 +21,10 @@ func NewReseedCommand() cli.Command {
 				Usage: "Your su3 signing ID (ex. something@mail.i2p)",
 			},
 			cli.StringFlag{
+				Name:  "tlsHost",
+				Usage: "The public hostname used on your TLS certificate",
+			},
+			cli.StringFlag{
 				Name:  "key",
 				Usage: "Path to your su3 signing private key",
 			},
@@ -32,12 +34,10 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "tlsCert",
-				Value: "tls_cert.pem",
 				Usage: "Path to a TLS certificate",
 			},
 			cli.StringFlag{
 				Name:  "tlsKey",
-				Value: "tls_key.pem",
 				Usage: "Path to a TLS private key",
 			},
 			cli.StringFlag{
@@ -92,9 +92,26 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
-	signerKey := c.String("key")
-	if signerKey == "" {
-		signerKey = signerFile(signerId) + ".pem"
+	var tlsCert, tlsKey string
+	tlsHost := c.String("tlsHost")
+	if tlsHost != "" {
+		tlsKey = c.String("tlsKey")
+		// if no key is specified, default to the host.pem in the current dir
+		if tlsKey == "" {
+			tlsKey = tlsHost + ".pem"
+		}
+
+		tlsCert = c.String("tlsCert")
+		// if no certificate is specified, default to the host.crt in the current dir
+		if tlsCert == "" {
+			tlsCert = tlsHost + ".crt"
+		}
+
+		// prompt to create tls keys if they don't exist?
+		err := checkOrNewTLSCert(tlsHost, &tlsCert, &tlsKey)
+		if nil != err {
+			log.Fatalln(err)
+		}
 	}
 
 	reloadIntvl, err := time.ParseDuration(c.String("interval"))
@@ -103,18 +120,14 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
-	// @todo: prompt to generate a new key
-	tlsKey := c.String("tlsKey")
-	tlsCert := c.String("tlsCert")
-
-	// use all cores
-	cpus := runtime.NumCPU()
-	runtime.GOMAXPROCS(cpus)
-	log.Printf("Using %d CPU cores.\n", cpus)
+	signerKey := c.String("key")
+	// if no key is specified, default to the signerId.pem in the current dir
+	if signerKey == "" {
+		signerKey = signerFile(signerId) + ".pem"
+	}
 
 	// load our signing privKey
-	// @todo: prompt to generate a new signing key if this one doesn't exist
-	privKey, err := loadPrivateKey(signerKey)
+	privKey, err := getOrNewSigningCert(&signerKey, signerId)
 	if nil != err {
 		log.Fatalln(err)
 	}
@@ -136,9 +149,7 @@ func reseedAction(c *cli.Context) {
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
-	_, certErr := os.Stat(tlsCert)
-	_, keyErr := os.Stat(tlsKey)
-	if certErr == nil && keyErr == nil {
+	if tlsHost != "" && tlsCert != "" && tlsKey != "" {
 		log.Printf("HTTPS server started on %s\n", server.Addr)
 		log.Fatalln(server.ListenAndServeTLS(tlsCert, tlsKey))
 	} else {

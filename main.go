@@ -2,12 +2,16 @@ package main
 
 import (
 	"os"
+	"runtime"
 
 	"github.com/MDrollette/go-i2p/cmd"
 	"github.com/codegangsta/cli"
 )
 
 func main() {
+	// use at most half the cpu cores
+	runtime.GOMAXPROCS(runtime.NumCPU() / 2)
+
 	app := cli.NewApp()
 	app.Name = "go-i2p"
 	app.Version = "0.1.0"
