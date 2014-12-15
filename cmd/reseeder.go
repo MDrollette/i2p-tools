@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"runtime"
 	"time"
 
@@ -135,7 +136,9 @@ func reseedAction(c *cli.Context) {
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
-	if tlsCert != "" && tlsKey != "" {
+	_, certErr := os.Stat(tlsCert)
+	_, keyErr := os.Stat(tlsKey)
+	if certErr == nil && keyErr == nil {
 		log.Printf("HTTPS server started on %s\n", server.Addr)
 		log.Fatalln(server.ListenAndServeTLS(tlsCert, tlsKey))
 	} else {
