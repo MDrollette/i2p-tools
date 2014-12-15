@@ -15,10 +15,10 @@ func main() {
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		cmd.NewReseedCommand(),
-		cmd.NewSu3VerifyCommand(),
+		// cmd.NewSu3VerifyCommand(),
 		cmd.NewKeygenCommand(),
-		cmd.NewSu3Command(),
-		cmd.NewSu3VerifyPublicCommand(),
+		// cmd.NewSu3Command(),
+		// cmd.NewSu3VerifyPublicCommand(),
 	}
 
 	if err := app.Run(os.Args); err != nil {

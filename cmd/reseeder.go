@@ -22,8 +22,20 @@ func NewReseedCommand() cli.Command {
 				Usage: "Your su3 signing ID (ex. something@mail.i2p)",
 			},
 			cli.StringFlag{
+				Name:  "key",
+				Usage: "Path to your su3 signing private key",
+			},
+			cli.StringFlag{
 				Name:  "netdb",
 				Usage: "Path to NetDB directory containing routerInfos",
+			},
+			cli.StringFlag{
+				Name:  "tlsCert",
+				Usage: "Path to a TLS certificate",
+			},
+			cli.StringFlag{
+				Name:  "tlsKey",
+				Usage: "Path to a TLS private key",
 			},
 			cli.StringFlag{
 				Name:  "ip",
@@ -35,19 +47,6 @@ func NewReseedCommand() cli.Command {
 				Value: "8080",
 				Usage: "Port to listen on",
 			},
-			cli.StringFlag{
-				Name:  "tlsCert",
-				Usage: "Path to TLS certificate",
-			},
-			cli.StringFlag{
-				Name:  "tlsKey",
-				Usage: "Path to TLS private key",
-			},
-			cli.StringFlag{
-				Name:  "keyFile",
-				Value: "reseed_private.pem",
-				Usage: "Path to your su3 signing private key",
-			},
 			cli.IntFlag{
 				Name:  "numRi",
 				Value: 75,
@@ -55,7 +54,8 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.IntFlag{
 				Name:  "numSu3",
-				Usage: "Number of su3 files to build",
+				Value: 0,
+				Usage: "Number of su3 files to build (0 = automatic based on size of netdb)",
 			},
 			cli.StringFlag{
 				Name:  "interval",
@@ -64,6 +64,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "prefix",
+				Value: "",
 				Usage: "Prefix path for the HTTP(S) server. (ex. /netdb)",
 			},
 			cli.BoolFlag{
@@ -88,10 +89,22 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
+	// @todo: prompt to generate a new key
+	signerKey := c.String("key")
+	if signerKey == "" {
+		fmt.Println("--key is required")
+		return
+	}
+
 	reloadIntvl, err := time.ParseDuration(c.String("interval"))
 	if nil != err {
-		log.Fatalf("'%s' is not a valid time interval.\n", reloadIntvl)
+		fmt.Printf("'%s' is not a valid time interval.\n", reloadIntvl)
+		return
 	}
+
+	// @todo: prompt to generate a new key
+	tlsKey := c.String("tlsKey")
+	tlsCert := c.String("tlsCert")
 
 	// use all cores
 	cpus := runtime.NumCPU()
@@ -99,7 +112,7 @@ func reseedAction(c *cli.Context) {
 	log.Printf("Using %d CPU cores.\n", cpus)
 
 	// load our signing privKey
-	privKey, err := loadPrivateKey(c.String("keyfile"))
+	privKey, err := loadPrivateKey(signerKey)
 	if nil != err {
 		log.Fatalln(err)
 	}
@@ -121,13 +134,11 @@ func reseedAction(c *cli.Context) {
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
-	// @todo check if tls cert exists, prompt to generate a new one if not
-
-	log.Printf("Server listening on %s\n", server.Addr)
-
-	if c.String("tlsCert") != "" && c.String("tlsKey") != "" {
-		log.Fatalln(server.ListenAndServeTLS(c.String("tlscert"), c.String("tlskey")))
+	if tlsCert != "" && tlsKey != "" {
+		log.Printf("HTTPS server started on %s\n", server.Addr)
+		log.Fatalln(server.ListenAndServeTLS(tlsCert, tlsKey))
 	} else {
+		log.Printf("HTTP server started on %s\n", server.Addr)
 		log.Fatalln(server.ListenAndServe())
 	}
 }

@@ -24,7 +24,10 @@ type Server struct {
 }
 
 func NewServer(prefix string, trustProxy bool) *Server {
-	config := &tls.Config{MinVersion: tls.VersionTLS10}
+	config := &tls.Config{
+		MinVersion:               tls.VersionTLS10,
+		PreferServerCipherSuites: true,
+	}
 	h := &http.Server{TLSConfig: config}
 	server := Server{h, nil}
 
