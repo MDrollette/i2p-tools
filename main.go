@@ -11,7 +11,9 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "go-i2p"
 	app.Version = "0.1.0"
-	app.Usage = "I2P commands"
+	app.Usage = "I2P tools and reseed server"
+	app.Author = "Matt Drollette"
+	app.Email = "matt@drollette.com"
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		cmd.NewReseedCommand(),
