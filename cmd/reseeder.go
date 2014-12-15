@@ -93,7 +93,7 @@ func reseedAction(c *cli.Context) {
 
 	signerKey := c.String("key")
 	if signerKey == "" {
-		signerKey = signerFile(signerId)
+		signerKey = signerFile(signerId) + ".pem"
 	}
 
 	reloadIntvl, err := time.ParseDuration(c.String("interval"))
