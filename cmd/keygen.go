@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/MDrollette/go-i2p/reseed"
 	"github.com/MDrollette/go-i2p/su3"
@@ -38,7 +37,8 @@ func keygenAction(c *cli.Context) {
 	host := c.String("host")
 
 	if signerId == "" && host == "" {
-		log.Fatalln("You must specify either a --host or a --signer")
+		fmt.Println("You must specify either --host or --signer")
+		return
 	}
 
 	if signerId != "" {
@@ -61,7 +61,7 @@ func createSigner(signerId string) {
 	signerCert, err := su3.NewSigningCertificate(signerId, signerKey)
 
 	// save cert
-	certFile := strings.Replace(signerId, "@", "_at_", 1) + ".crt"
+	certFile := signerFile(signerId) + ".crt"
 	certOut, err := os.Create(certFile)
 	if err != nil {
 		log.Printf("failed to open %s for writing\n", certFile)
@@ -72,7 +72,7 @@ func createSigner(signerId string) {
 	fmt.Println("signing certificate saved to:", certFile)
 
 	// save signing private key
-	privFile := strings.Replace(signerId, "@", "_at_", 1) + ".pem"
+	privFile := signerFile(signerId) + ".pem"
 	keyOut, err := os.OpenFile(privFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Printf("failed to open %s for writing\n", privFile)

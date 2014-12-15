@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"io/ioutil"
+	"strings"
 )
 
 func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
@@ -20,4 +21,8 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	}
 
 	return privKey, nil
+}
+
+func signerFile(signerId string) string {
+	return strings.Replace(signerId, "@", "_at_", 1)
 }

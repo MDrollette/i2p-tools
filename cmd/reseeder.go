@@ -31,10 +31,12 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "tlsCert",
+				Value: "tls_cert.pem",
 				Usage: "Path to a TLS certificate",
 			},
 			cli.StringFlag{
 				Name:  "tlsKey",
+				Value: "tls_key.pem",
 				Usage: "Path to a TLS private key",
 			},
 			cli.StringFlag{
@@ -89,11 +91,9 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
-	// @todo: prompt to generate a new key
 	signerKey := c.String("key")
 	if signerKey == "" {
-		fmt.Println("--key is required")
-		return
+		signerKey = signerFile(signerId)
 	}
 
 	reloadIntvl, err := time.ParseDuration(c.String("interval"))
@@ -112,6 +112,7 @@ func reseedAction(c *cli.Context) {
 	log.Printf("Using %d CPU cores.\n", cpus)
 
 	// load our signing privKey
+	// @todo: prompt to generate a new signing key if this one doesn't exist
 	privKey, err := loadPrivateKey(signerKey)
 	if nil != err {
 		log.Fatalln(err)
