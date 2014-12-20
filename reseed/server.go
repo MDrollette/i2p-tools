@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -54,7 +55,11 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	}
 
 	errorHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
 		w.WriteHeader(http.StatusNotFound)
+		if _, err := w.Write(nil); nil != err {
+			log.Println(err)
+		}
 	})
 
 	mux := http.NewServeMux()
