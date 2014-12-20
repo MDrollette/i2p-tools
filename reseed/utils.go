@@ -1,8 +1,8 @@
 package reseed
 
 import (
-	"crypto/ecdsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -33,7 +33,7 @@ func SignerFilename(signer string) string {
 	return strings.Replace(signer, "@", "_at_", 1) + ".crt"
 }
 
-func NewTLSCertificate(host string, priv *ecdsa.PrivateKey) ([]byte, error) {
+func NewTLSCertificate(host string, priv *rsa.PrivateKey) ([]byte, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(2 * 365 * 24 * time.Hour)
 
@@ -55,7 +55,7 @@ func NewTLSCertificate(host string, priv *ecdsa.PrivateKey) ([]byte, error) {
 		},
 		NotBefore:          notBefore,
 		NotAfter:           notAfter,
-		SignatureAlgorithm: x509.ECDSAWithSHA256,
+		SignatureAlgorithm: x509.SHA256WithRSA,
 
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
