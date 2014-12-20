@@ -55,7 +55,6 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	}
 
 	errorHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Connection", "close")
 		w.WriteHeader(http.StatusNotFound)
 		if _, err := w.Write(nil); nil != err {
 			log.Println(err)
@@ -63,8 +62,8 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	})
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middlewareChain.Append(loggingMiddleware).Then(errorHandler))
-	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Append(loggingMiddleware, verifyMiddleware, th.Throttle).Then(http.HandlerFunc(server.reseedHandler)))
+	mux.Handle("/", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware).Then(errorHandler))
+	mux.Handle(prefix+"/i2pseeds.su3", middlewareChain.Append(disableKeepAliveMiddleware, loggingMiddleware, verifyMiddleware, th.Throttle).Then(http.HandlerFunc(server.reseedHandler)))
 	server.Handler = mux
 
 	return &server
@@ -84,6 +83,14 @@ func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", strconv.FormatInt(int64(len(su3Bytes)), 10))
 
 	io.Copy(w, bytes.NewReader(su3Bytes))
+}
+
+func disableKeepAliveMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Connection", "close")
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
 }
 
 func loggingMiddleware(next http.Handler) http.Handler {
