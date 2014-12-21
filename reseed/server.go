@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -70,7 +71,12 @@ func NewServer(prefix string, trustProxy bool) *Server {
 }
 
 func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
-	peer := Peer(r.RemoteAddr)
+	var peer Peer
+	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		peer = Peer(ip)
+	} else {
+		peer = Peer(r.RemoteAddr)
+	}
 
 	su3Bytes, err := s.Reseeder.PeerSu3Bytes(peer)
 	if nil != err {
