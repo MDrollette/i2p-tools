@@ -14,8 +14,6 @@ $ i2p-tools -h
 ...
 ```
 
-Otherwise, a binary for your OS can be downloaded from http://matt.i2p/
-
 ## Usage
 
 If this is your first time running a reseed server (ie. you don't have any existing keys). You can simply run the following command and follow the prompts to create the appropriate keys and certificates.
