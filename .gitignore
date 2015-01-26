@@ -6,3 +6,5 @@ i2pseeds.su3
 reseed_cert.pem
 reseed_private.pem
 /build
+/.build
+/release/i2p-tools
