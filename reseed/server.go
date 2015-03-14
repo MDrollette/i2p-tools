@@ -48,7 +48,7 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	h := &http.Server{TLSConfig: config}
 	server := Server{h, nil}
 
-	th := throttled.RateLimit(throttled.PerHour(120), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(10000))
+	th := throttled.RateLimit(throttled.PerDay(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(100000))
 
 	middlewareChain := alice.New()
 	if trustProxy {
