@@ -53,7 +53,7 @@ func NewReseeder(netdb NetDbProvider) *ReseederImpl {
 		netdb:           netdb,
 		su3s:            make(chan [][]byte),
 		NumRi:           75,
-		RebuildInterval: 12 * time.Hour,
+		RebuildInterval: 24 * time.Hour,
 	}
 }
 
@@ -251,6 +251,12 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 		riBytes, err := ioutil.ReadFile(path)
 		if nil != err {
 			log.Println(err)
+			continue
+		}
+
+		// ignore outdate routerInfos
+		age := time.Since(file.ModTime())
+		if age.Hours() > 96 {
 			continue
 		}
 
