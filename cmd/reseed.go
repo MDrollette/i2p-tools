@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/MDrollette/i2p-tools/reseed"
@@ -73,6 +75,11 @@ func NewReseedCommand() cli.Command {
 			cli.BoolFlag{
 				Name:  "trustProxy",
 				Usage: "If provided, we will trust the 'X-Forwarded-For' header in requests (ex. behind cloudflare)",
+			},
+			cli.StringFlag{
+				Name:  "blacklist",
+				Value: "",
+				Usage: "Path to a txt file containing a list of IPs to deny connections from.",
 			},
 		},
 	}
@@ -148,6 +155,16 @@ func reseedAction(c *cli.Context) {
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
+
+	// load a blacklist
+	blacklistFile := c.String("blacklist")
+	if blacklistFile != "" {
+		if content, err := ioutil.ReadFile(blacklistFile); err == nil {
+			server.Blacklist = strings.Split(string(content), "\n")
+		} else {
+			log.Fatalln("Failed to load blacklist: ", err)
+		}
+	}
 
 	if tlsHost != "" && tlsCert != "" && tlsKey != "" {
 		log.Printf("HTTPS server started on %s\n", server.Addr)

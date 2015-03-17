@@ -20,6 +20,40 @@ const (
 	I2P_USER_AGENT = "Wget/1.11.4"
 )
 
+type Listener struct {
+	net.Listener
+	Blacklist []string
+}
+
+func (nl Listener) Accept() (net.Conn, error) {
+	for {
+		c, err := nl.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+
+		host, port, err := net.SplitHostPort(c.RemoteAddr().String())
+		if err != nil {
+			l.Printf("accept fail: %s\n", err.Error())
+			go c.Close()
+			continue
+		}
+
+		ip := net.ParseIP(host)
+
+		for _, cidr := range nl.Blacklist {
+			if _, ipnet, err := net.ParseCIDR(cidr); err == nil {
+				if ipnet.Contains(ip) {
+					l.Printf("allow conn from: %s:%s\n", host, port)
+					return c, err
+				}
+			}
+		}
+
+		go c.Close()
+	}
+}
+
 type Server struct {
 	*http.Server
 	Reseeder Reseeder
