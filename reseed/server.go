@@ -80,7 +80,7 @@ func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 
 	su3Bytes, err := s.Reseeder.PeerSu3Bytes(peer)
 	if nil != err {
-		http.Error(w, "500 Unable to get SU3", http.StatusInternalServerError)
+		http.Error(w, "500 Unable to serve su3", http.StatusInternalServerError)
 		return
 	}
 

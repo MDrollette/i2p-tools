@@ -3,6 +3,7 @@ package reseed
 import (
 	"crypto/rsa"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"io/ioutil"
@@ -198,6 +199,10 @@ func (rs *ReseederImpl) su3Builder(in <-chan []routerInfo) <-chan *su3.Su3File {
 func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
 	m := <-rs.su3s
 	defer func() { rs.su3s <- m }()
+
+	if 0 == len(m) {
+		return nil, errors.New("404")
+	}
 
 	return m[peer.Hash()%len(m)], nil
 }
