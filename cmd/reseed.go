@@ -47,7 +47,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "port",
-				Value: "8080",
+				Value: "8443",
 				Usage: "Port to listen on",
 			},
 			cli.IntFlag{
@@ -62,7 +62,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "interval",
-				Value: "12h",
+				Value: "24h",
 				Usage: "Duration between SU3 cache rebuilds (ex. 12h, 15m)",
 			},
 			cli.StringFlag{
