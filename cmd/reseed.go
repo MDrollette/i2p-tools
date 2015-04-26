@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/MDrollette/i2p-tools/reseed"
@@ -153,17 +151,15 @@ func reseedAction(c *cli.Context) {
 
 	// create a server
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
+	blacklist := reseed.NewBlacklist()
+	server.Blacklist = blacklist
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
 	// load a blacklist
 	blacklistFile := c.String("blacklist")
-	if blacklistFile != "" {
-		if content, err := ioutil.ReadFile(blacklistFile); err == nil {
-			server.Blacklist = strings.Split(string(content), "\n")
-		} else {
-			log.Fatalln("Failed to load blacklist: ", err)
-		}
+	if "" != blacklistFile {
+		blacklist.LoadFile(blacklistFile)
 	}
 
 	if tlsHost != "" && tlsCert != "" && tlsKey != "" {

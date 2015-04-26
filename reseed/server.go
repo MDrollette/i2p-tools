@@ -20,43 +20,52 @@ const (
 	I2P_USER_AGENT = "Wget/1.11.4"
 )
 
-type Listener struct {
-	net.Listener
-	Blacklist []string
-}
-
-func (nl Listener) Accept() (net.Conn, error) {
-	for {
-		c, err := nl.Listener.Accept()
-		if err != nil {
-			return nil, err
-		}
-
-		host, port, err := net.SplitHostPort(c.RemoteAddr().String())
-		if err != nil {
-			l.Printf("accept fail: %s\n", err.Error())
-			go c.Close()
-			continue
-		}
-
-		ip := net.ParseIP(host)
-
-		for _, cidr := range nl.Blacklist {
-			if _, ipnet, err := net.ParseCIDR(cidr); err == nil {
-				if ipnet.Contains(ip) {
-					l.Printf("allow conn from: %s:%s\n", host, port)
-					return c, err
-				}
-			}
-		}
-
-		go c.Close()
-	}
-}
-
 type Server struct {
 	*http.Server
-	Reseeder Reseeder
+	Reseeder  Reseeder
+	Blacklist *Blacklist
+}
+
+func (srv *Server) ListenAndServe() error {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	return srv.Serve(newBlacklistListener(ln, srv.Blacklist))
+}
+
+func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":https"
+	}
+	config := &tls.Config{}
+	if srv.TLSConfig != nil {
+		*config = *srv.TLSConfig
+	}
+	if config.NextProtos == nil {
+		config.NextProtos = []string{"http/1.1"}
+	}
+
+	var err error
+	config.Certificates = make([]tls.Certificate, 1)
+	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	tlsListener := tls.NewListener(newBlacklistListener(ln, srv.Blacklist), config)
+	return srv.Serve(tlsListener)
 }
 
 func NewServer(prefix string, trustProxy bool) *Server {
@@ -80,7 +89,7 @@ func NewServer(prefix string, trustProxy bool) *Server {
 		},
 	}
 	h := &http.Server{TLSConfig: config}
-	server := Server{h, nil}
+	server := Server{Server: h, Reseeder: nil}
 
 	th := throttled.RateLimit(throttled.PerDay(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(100000))
 
