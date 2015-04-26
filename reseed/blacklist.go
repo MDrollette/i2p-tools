@@ -2,7 +2,6 @@ package reseed
 
 import (
 	"io/ioutil"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -66,7 +65,6 @@ func (ln blacklistListener) Accept() (net.Conn, error) {
 
 	if ln.blacklist.isBlocked(ip) {
 		tc.Close()
-		log.Printf("blocked connection from: %s\n", ip)
 		return tc, nil
 	}
 

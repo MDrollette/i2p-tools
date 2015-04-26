@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"runtime"
 	"time"
 
 	"github.com/MDrollette/i2p-tools/reseed"
@@ -79,6 +80,11 @@ func NewReseedCommand() cli.Command {
 				Value: "",
 				Usage: "Path to a txt file containing a list of IPs to deny connections from.",
 			},
+			cli.DurationFlag{
+				Name:  "stats",
+				Value: 0,
+				Usage: "Periodically print memory stats.",
+			},
 		},
 	}
 }
@@ -151,15 +157,26 @@ func reseedAction(c *cli.Context) {
 
 	// create a server
 	server := reseed.NewServer(c.String("prefix"), c.Bool("trustProxy"))
-	blacklist := reseed.NewBlacklist()
-	server.Blacklist = blacklist
 	server.Reseeder = reseeder
 	server.Addr = net.JoinHostPort(c.String("ip"), c.String("port"))
 
 	// load a blacklist
+	blacklist := reseed.NewBlacklist()
+	server.Blacklist = blacklist
 	blacklistFile := c.String("blacklist")
 	if "" != blacklistFile {
 		blacklist.LoadFile(blacklistFile)
+	}
+
+	// print stats once in a while
+	if c.Duration("stats") != 0 {
+		go func() {
+			var mem runtime.MemStats
+			for _ = range time.Tick(c.Duration("stats")) {
+				runtime.ReadMemStats(&mem)
+				log.Printf("TotalAllocs: %d Kb, Allocs: %d Kb, Mallocs: %d, NumGC: %d", mem.TotalAlloc/1024, mem.Alloc/1024, mem.Mallocs, mem.NumGC)
+			}
+		}()
 	}
 
 	if tlsHost != "" && tlsCert != "" && tlsKey != "" {
