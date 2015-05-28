@@ -4,6 +4,8 @@ DOCKER_IMAGE = mdrollette/$(NAME)
 all: build
  
 .build: .
+	docker pull golang:1.4.2
+	docker pull progrium/busybox:latest
 	docker build -t $(NAME) .
 	docker inspect -f '{{.Id}}' $(NAME) > .build
  

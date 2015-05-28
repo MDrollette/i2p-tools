@@ -1,4 +1,4 @@
-FROM golang
+FROM golang:1.4.2
 
 # Copy the local package files to the container's workspace.
 ADD . /go/src/github.com/MDrollette/i2p-tools
