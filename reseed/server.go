@@ -10,8 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/PuerkitoBio/throttled"
-	"github.com/PuerkitoBio/throttled/store"
+	"gopkg.in/throttled/throttled.v2"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
 )
