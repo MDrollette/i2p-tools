@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/darknetj/i2p-tools/reseed"
-	"github.com/darknetj/i2p-tools/su3"
+	"github.com/MDrollette/i2p-tools/reseed"
+	"github.com/MDrollette/i2p-tools/su3"
 	"github.com/codegangsta/cli"
 )
 
