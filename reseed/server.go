@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"github.com/throttled/"
+	"github.com/throttled/throttled"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
 )
