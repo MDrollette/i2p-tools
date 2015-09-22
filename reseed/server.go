@@ -9,8 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-
-	"gopkg.in/throttled/throttled.v2"
+	"github.com/throttled/"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
 )
