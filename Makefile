@@ -1,5 +1,5 @@
 NAME = i2p-tools
-DOCKER_IMAGE = mdrollette/$(NAME)
+DOCKER_IMAGE = martin61/$(NAME)
  
 all: build
  
