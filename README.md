@@ -8,7 +8,7 @@ This tool provides a secure and efficient reseed server for the I2P network. The
 If you have Go installed you can download, build, and install this tool with `go get`
 
 ```
-$ go get github.com/MDrollette/i2p-tools
+$ go get github.com/martin61/i2p-tools
 ...
 $ i2p-tools -h
 ...
