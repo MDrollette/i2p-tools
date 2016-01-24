@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/MDrollette/i2p-tools/reseed"
+	"github.com/martin61/i2p-tools/reseed"
 	"github.com/codegangsta/cli"
 )
 
