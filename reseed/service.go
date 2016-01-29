@@ -54,7 +54,8 @@ func NewReseeder(netdb NetDbProvider) *ReseederImpl {
 		netdb:           netdb,
 		su3s:            make(chan [][]byte),
 		NumRi:           75,
-		RebuildInterval: 24 * time.Hour,
+//		RebuildInterval: 24 * time.Hour,
+		RebuildInterval: 72 * time.Hour,
 	}
 }
 

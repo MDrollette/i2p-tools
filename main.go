@@ -17,7 +17,7 @@ func main() {
 	app.Version = "0.1.1"
 	app.Usage = "I2P tools and reseed server"
 	app.Author = "martin61"
-	app.Email = "-"
+	app.Email = "na"
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		cmd.NewReseedCommand(),

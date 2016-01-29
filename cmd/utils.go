@@ -5,6 +5,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/elliptic"
+	"crypto/ecdsa"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -122,7 +125,8 @@ func createSigningCertificate(signerId string) error {
 
 func createTLSCertificate(host string) error {
 	fmt.Println("Generating TLS keys. This may take a minute...")
-	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+//	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return err
 	}
@@ -147,7 +151,13 @@ func createTLSCertificate(host string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open %s for writing: %s\n", privFile, err)
 	}
-	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+//	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	secp384r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 3, 132, 0, 34})		// http://www.ietf.org/rfc/rfc5480.txt
+	pem.Encode(keyOut, &pem.Block{Type: "EC PARAMETERS", Bytes: secp384r1})
+	ecder, err := x509.MarshalECPrivateKey(priv)
+	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: ecder})
+	pem.Encode(keyOut, &pem.Block{Type: "CERTIFICATE", Bytes: tlsCert})
+
 	keyOut.Close()
 	fmt.Printf("TLS private key saved to: %s\n", privFile)
 

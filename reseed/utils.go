@@ -2,7 +2,8 @@ package reseed
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
+//	"crypto/rsa"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -33,9 +34,10 @@ func SignerFilename(signer string) string {
 	return strings.Replace(signer, "@", "_at_", 1) + ".crt"
 }
 
-func NewTLSCertificate(host string, priv *rsa.PrivateKey) ([]byte, error) {
+//func NewTLSCertificate(host string, priv *rsa.PrivateKey) ([]byte, error) {
+func NewTLSCertificate(host string, priv *ecdsa.PrivateKey) ([]byte, error) {
 	notBefore := time.Now()
-	notAfter := notBefore.Add(2 * 365 * 24 * time.Hour)
+	notAfter := notBefore.Add(5 * 365 * 24 * time.Hour)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -55,7 +57,8 @@ func NewTLSCertificate(host string, priv *rsa.PrivateKey) ([]byte, error) {
 		},
 		NotBefore:          notBefore,
 		NotAfter:           notAfter,
-		SignatureAlgorithm: x509.SHA256WithRSA,
+//              SignatureAlgorithm: x509.SHA256WithRSA,
+		SignatureAlgorithm: x509.ECDSAWithSHA512,
 
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
