@@ -53,7 +53,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.IntFlag{
 				Name:  "numRi",
-				Value: 75,
+				Value: 77,
 				Usage: "Number of routerInfos to include in each su3 file",
 			},
 			cli.IntFlag{
@@ -63,7 +63,7 @@ func NewReseedCommand() cli.Command {
 			},
 			cli.StringFlag{
 				Name:  "interval",
-				Value: "24h",
+				Value: "90h",
 				Usage: "Duration between SU3 cache rebuilds (ex. 12h, 15m)",
 			},
 			cli.StringFlag{

@@ -14,10 +14,10 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "i2p-tools"
-	app.Version = "0.1.1"
+	app.Version = "0.1.2"
 	app.Usage = "I2P tools and reseed server"
 	app.Author = "martin61"
-	app.Email = "na"
+	app.Email = "noemail"
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		cmd.NewReseedCommand(),
