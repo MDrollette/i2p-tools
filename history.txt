@@ -1,0 +1,11 @@
+2016-01-31
+ * allowed TLS ciphers updated (hardened)
+ * TLS certificate generation: RSA 4096 --> ECDSAWithSHA512 384bit secp384r1
+ * ECDHE handshake: only CurveP384 + CurveP521, default CurveP256 removed
+ * TLS certificate valid: 2y --> 5y
+ * throttled.PerDay(4) --> PerHour(4), to enable limited testing
+ * su3 RebuildInterval: 24h --> 90h, higher anonymity for the running i2p-router
+ * numRi per su3 file: 75 --> 77
+
+2016-01
+ * fork from https://github.com/MDrollette/i2p-tools
