@@ -29,3 +29,5 @@ GOPATH=$HOME/go; cd $GOPATH; bin/i2p-tools reseed --signer=you@mail.i2p --netdb=
 
 If this is your first time running a reseed server (ie. you don't have any existing keys), you can simply run the command and follow the prompts to create the appropriate keys and certificates.
 Afterwards an HTTPS reseed server will start on the default port and generate 4 files in your current directory (a TLS key and certificate, and a signing key and certificate).
+
+Get a the source code and a pre-build binary anonymously on http://reseed.i2p/ - also short guide and complete tech info.
