@@ -1,4 +1,9 @@
-2013-03-05
+2016-05-15
+ * README.md updated
+ * allowed routerInfos age increased from 96 to 192
+ * app.Version = "0.1.4"
+
+2016-03-05
  * app.Version = "0.1.3"
  * CRL creation added
 
