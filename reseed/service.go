@@ -261,7 +261,7 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 
 		// ignore outdate routerInfos
 		age := time.Since(file.ModTime())
-		if age.Hours() > 96 {
+		if age.Hours() > 192 {
 			continue
 		}
 
