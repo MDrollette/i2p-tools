@@ -3,7 +3,8 @@ package su3
 import (
 	"bytes"
 	"crypto"
-	"crypto/rand"
+	crypto_rand "crypto/rand"
+	math_rand "math/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
@@ -53,8 +54,13 @@ type Su3File struct {
 }
 
 func NewSu3File() *Su3File {
+
+	// added 6h random time delta to increase Anonymity
+	rr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+	now := time.Now().Unix() - rr.Int63n(60*60*6)
+
 	return &Su3File{
-		Version:       []byte(strconv.FormatInt(time.Now().Unix(), 10)),
+		Version:       []byte(strconv.FormatInt(now, 10)),
 		SignatureType: SIGTYPE_RSA_SHA512,
 	}
 }
@@ -78,7 +84,7 @@ func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
 	h.Write(s.BodyBytes())
 	digest := h.Sum(nil)
 
-	sig, err := rsa.SignPKCS1v15(rand.Reader, privkey, 0, digest)
+	sig, err := rsa.SignPKCS1v15(crypto_rand.Reader, privkey, 0, digest)
 	if nil != err {
 		return err
 	}

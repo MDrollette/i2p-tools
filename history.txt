@@ -1,6 +1,12 @@
+2016-10-09
+ * seed the math random generator with time.Now().UnixNano()
+ * added 6h+6h random time delta at su3-age to increase anonymity
+ * app.Version = "0.1.5"
+
+
 2016-05-15
  * README.md updated
- * allowed routerInfos age increased from 96 to 192
+ * allowed routerInfos age increased from 96 to 192 hours
  * app.Version = "0.1.4"
 
 2016-03-05
