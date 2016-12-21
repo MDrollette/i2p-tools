@@ -1,3 +1,7 @@
+2016-12-21
+ * deactivating previous random time delta, makes only sense when patching ri too
+ * app.Version = "0.1.6"
+
 2016-10-09
  * seed the math random generator with time.Now().UnixNano()
  * added 6h+6h random time delta at su3-age to increase anonymity

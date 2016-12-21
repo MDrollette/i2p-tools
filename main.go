@@ -14,7 +14,7 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "i2p-tools"
-	app.Version = "0.1.5"
+	app.Version = "0.1.6"
 	app.Usage = "I2P tools and reseed server"
 	app.Author = "martin61"
 	app.Email = "noemail"

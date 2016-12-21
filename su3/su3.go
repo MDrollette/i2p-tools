@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	crypto_rand "crypto/rand"
-	math_rand "math/rand"
+	//math_rand "math/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
@@ -56,11 +56,12 @@ type Su3File struct {
 func NewSu3File() *Su3File {
 
 	// added 6h random time delta to increase Anonymity
-	rr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
-	now := time.Now().Unix() - rr.Int63n(60*60*6)
+	//rr := math_rand.New(math_rand.NewSource(time.Now().UnixNano()))
+	//now := time.Now().Unix() - rr.Int63n(60*60*6)
 
 	return &Su3File{
-		Version:       []byte(strconv.FormatInt(now, 10)),
+		//Version:       []byte(strconv.FormatInt(now, 10)),
+		Version:       []byte(strconv.FormatInt(time.Now().Unix(), 10)),
 		SignatureType: SIGTYPE_RSA_SHA512,
 	}
 }

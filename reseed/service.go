@@ -266,14 +266,14 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 		}
 
 		// added 6h+6h random time delta to increase Anonymity
-		rr := rand.New(rand.NewSource(time.Now().UnixNano()))
-		now := file.ModTime()
-		then := now.Add(-1 * time.Duration(rr.Intn(60*60*6) + 60*60*6) * time.Second)
+		//rr := rand.New(rand.NewSource(time.Now().UnixNano()))
+		//now := file.ModTime()
+		//then := now.Add(-1 * time.Duration(rr.Intn(60*60*6) + 60*60*6) * time.Second)
 
 		routerInfos = append(routerInfos, routerInfo{
 			Name:    file.Name(),
-			//ModTime: file.ModTime(),
-			ModTime: then,
+			ModTime: file.ModTime(),
+			//ModTime: then,
 			Data:    riBytes,
 		})
 	}
