@@ -2,22 +2,22 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/elliptic"
-	"crypto/ecdsa"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
-	"fmt"
+	"fmt"ss
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-	"crypto/x509/pkix"
 
-	"github.com/martin61/i2p-tools/reseed"
-	"github.com/martin61/i2p-tools/su3"
+	"github.com/MDrollette/i2p-tools/reseed"
+	"github.com/MDrollette/i2p-tools/su3"
 )
 
 func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
@@ -123,7 +123,6 @@ func createSigningCertificate(signerId string) error {
 	keyOut.Close()
 	fmt.Println("\tSigning private key saved to:", privFile)
 
-
 	// CRL
 	crlFile := signerFile(signerId) + ".crl"
 	crlOut, err := os.OpenFile(crlFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -131,9 +130,9 @@ func createSigningCertificate(signerId string) error {
 		return fmt.Errorf("failed to open %s for writing: %s", crlFile, err)
 	}
 	crlcert, err := x509.ParseCertificate(signerCert)
-		if err != nil {
-			return fmt.Errorf("Certificate with unknown critical extension was not parsed: %s", err)
-		}
+	if err != nil {
+		return fmt.Errorf("Certificate with unknown critical extension was not parsed: %s", err)
+	}
 
 	now := time.Now()
 	revokedCerts := []pkix.RevokedCertificate{
@@ -155,13 +154,12 @@ func createSigningCertificate(signerId string) error {
 	crlOut.Close()
 	fmt.Printf("\tSigning CRL saved to: %s\n", crlFile)
 
-
 	return nil
 }
 
 func createTLSCertificate(host string) error {
 	fmt.Println("Generating TLS keys. This may take a minute...")
-//	priv, err := rsa.GenerateKey(rand.Reader, 4096)
+	//	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return err
@@ -187,8 +185,7 @@ func createTLSCertificate(host string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open %s for writing: %s\n", privFile, err)
 	}
-//	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
-	secp384r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 3, 132, 0, 34})		// http://www.ietf.org/rfc/rfc5480.txt
+	secp384r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 3, 132, 0, 34}) // http://www.ietf.org/rfc/rfc5480.txt
 	pem.Encode(keyOut, &pem.Block{Type: "EC PARAMETERS", Bytes: secp384r1})
 	ecder, err := x509.MarshalECPrivateKey(priv)
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: ecder})
@@ -197,7 +194,6 @@ func createTLSCertificate(host string) error {
 	keyOut.Close()
 	fmt.Printf("\tTLS private key saved to: %s\n", privFile)
 
-
 	// CRL
 	crlFile := host + ".crl"
 	crlOut, err := os.OpenFile(crlFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -205,9 +201,9 @@ func createTLSCertificate(host string) error {
 		return fmt.Errorf("failed to open %s for writing: %s", crlFile, err)
 	}
 	crlcert, err := x509.ParseCertificate(tlsCert)
-		if err != nil {
-			return fmt.Errorf("Certificate with unknown critical extension was not parsed: %s", err)
-		}
+	if err != nil {
+		return fmt.Errorf("Certificate with unknown critical extension was not parsed: %s", err)
+	}
 
 	now := time.Now()
 	revokedCerts := []pkix.RevokedCertificate{
@@ -228,7 +224,6 @@ func createTLSCertificate(host string) error {
 	pem.Encode(crlOut, &pem.Block{Type: "X509 CRL", Bytes: crlBytes})
 	crlOut.Close()
 	fmt.Printf("\tTLS CRL saved to: %s\n", crlFile)
-
 
 	return nil
 }

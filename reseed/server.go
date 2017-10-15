@@ -10,10 +10,10 @@ import (
 	"os"
 	"strconv"
 
-	"gopkg.in/throttled/throttled.v2"
-	"gopkg.in/throttled/throttled.v2/store"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
+	"gopkg.in/throttled/throttled.v2"
+	"gopkg.in/throttled/throttled.v2/store"
 )
 
 const (
@@ -82,12 +82,11 @@ func NewServer(prefix string, trustProxy bool) *Server {
 			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
 			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
 		},
-		CurvePreferences: []tls.CurveID{tls.CurveP384, tls.CurveP521},		// default CurveP256 removed
+		CurvePreferences: []tls.CurveID{tls.CurveP384, tls.CurveP521}, // default CurveP256 removed
 	}
 	h := &http.Server{TLSConfig: config}
 	server := Server{Server: h, Reseeder: nil}
 
-//	th := throttled.RateLimit(throttled.PerDay(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
 	th := throttled.RateLimit(throttled.PerHour(4), &throttled.VaryBy{RemoteAddr: true}, store.NewMemStore(200000))
 
 	middlewareChain := alice.New()

@@ -4,7 +4,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/martin61/i2p-tools/cmd"
+	"github.com/MDrollette/i2p-tools/cmd"
 	"github.com/codegangsta/cli"
 )
 
@@ -14,10 +14,10 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "i2p-tools"
-	app.Version = "0.1.6"
+	app.Version = "0.1.7"
 	app.Usage = "I2P tools and reseed server"
-	app.Author = "martin61"
-	app.Email = "noemail"
+	app.Author = "MDrollette"
+	app.Email = "matt@rows.io"
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		cmd.NewReseedCommand(),
