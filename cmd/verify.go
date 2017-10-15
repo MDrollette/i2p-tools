@@ -25,7 +25,7 @@ func NewSu3VerifyCommand() cli.Command {
 }
 
 func su3VerifyAction(c *cli.Context) {
-	su3File := su3.Su3File{}
+	su3File := su3.New()
 
 	data, err := ioutil.ReadFile(c.Args().Get(0))
 	if nil != err {
@@ -39,7 +39,7 @@ func su3VerifyAction(c *cli.Context) {
 
 	// get the reseeder key
 	ks := reseed.KeyStore{Path: "./certificates"}
-	cert, err := ks.ReseederCertificate(su3File.SignerId)
+	cert, err := ks.ReseederCertificate(su3File.SignerID)
 	if nil != err {
 		fmt.Println(err)
 		return
@@ -49,7 +49,7 @@ func su3VerifyAction(c *cli.Context) {
 		panic(err)
 	}
 
-	fmt.Printf("Signature is valid for signer '%s'\n", su3File.SignerId)
+	fmt.Printf("Signature is valid for signer '%s'\n", su3File.SignerID)
 
 	if c.Bool("extract") {
 		// @todo: don't assume zip

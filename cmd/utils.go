@@ -35,25 +35,24 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	return privKey, nil
 }
 
-func signerFile(signerId string) string {
-	return strings.Replace(signerId, "@", "_at_", 1)
+func signerFile(signerID string) string {
+	return strings.Replace(signerID, "@", "_at_", 1)
 }
 
-func getOrNewSigningCert(signerKey *string, signerId string) (*rsa.PrivateKey, error) {
+func getOrNewSigningCert(signerKey *string, signerID string) (*rsa.PrivateKey, error) {
 	if _, err := os.Stat(*signerKey); nil != err {
 		fmt.Printf("Unable to read signing key '%s'\n", *signerKey)
-		fmt.Printf("Would you like to generate a new signing key for %s? (y or n): ", signerId)
+		fmt.Printf("Would you like to generate a new signing key for %s? (y or n): ", signerID)
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		if []byte(input)[0] != 'y' {
 			return nil, fmt.Errorf("A signing key is required")
-		} else {
-			if err := createSigningCertificate(signerId); nil != err {
-				return nil, err
-			}
-
-			*signerKey = signerFile(signerId) + ".pem"
 		}
+		if err := createSigningCertificate(signerID); nil != err {
+			return nil, err
+		}
+
+		*signerKey = signerFile(signerID) + ".pem"
 	}
 
 	return loadPrivateKey(*signerKey)
@@ -76,20 +75,20 @@ func checkOrNewTLSCert(tlsHost string, tlsCert, tlsKey *string) error {
 		if []byte(input)[0] != 'y' {
 			fmt.Println("Continuing without TLS")
 			return nil
-		} else {
-			if err := createTLSCertificate(tlsHost); nil != err {
-				return err
-			}
-
-			*tlsCert = tlsHost + ".crt"
-			*tlsKey = tlsHost + ".pem"
 		}
+
+		if err := createTLSCertificate(tlsHost); nil != err {
+			return err
+		}
+
+		*tlsCert = tlsHost + ".crt"
+		*tlsKey = tlsHost + ".pem"
 	}
 
 	return nil
 }
 
-func createSigningCertificate(signerId string) error {
+func createSigningCertificate(signerID string) error {
 	// generate private key
 	fmt.Println("Generating signing keys. This may take a minute...")
 	signerKey, err := rsa.GenerateKey(rand.Reader, 4096)
@@ -97,26 +96,26 @@ func createSigningCertificate(signerId string) error {
 		return err
 	}
 
-	signerCert, err := su3.NewSigningCertificate(signerId, signerKey)
+	signerCert, err := su3.NewSigningCertificate(signerID, signerKey)
 	if nil != err {
 		return err
 	}
 
 	// save cert
-	certFile := signerFile(signerId) + ".crt"
+	certFile := signerFile(signerID) + ".crt"
 	certOut, err := os.Create(certFile)
 	if err != nil {
-		return fmt.Errorf("failed to open %s for writing: %s\n", certFile, err)
+		return fmt.Errorf("failed to open %s for writing: %v", certFile, err)
 	}
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: signerCert})
 	certOut.Close()
 	fmt.Println("\tSigning certificate saved to:", certFile)
 
 	// save signing private key
-	privFile := signerFile(signerId) + ".pem"
+	privFile := signerFile(signerID) + ".pem"
 	keyOut, err := os.OpenFile(privFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to open %s for writing: %s\n", privFile, err)
+		return fmt.Errorf("failed to open %s for writing: %v", privFile, err)
 	}
 	pem.Encode(keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(signerKey)})
 	pem.Encode(keyOut, &pem.Block{Type: "CERTIFICATE", Bytes: signerCert})
@@ -124,7 +123,7 @@ func createSigningCertificate(signerId string) error {
 	fmt.Println("\tSigning private key saved to:", privFile)
 
 	// CRL
-	crlFile := signerFile(signerId) + ".crl"
+	crlFile := signerFile(signerID) + ".crl"
 	crlOut, err := os.OpenFile(crlFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open %s for writing: %s", crlFile, err)
@@ -159,7 +158,6 @@ func createSigningCertificate(signerId string) error {
 
 func createTLSCertificate(host string) error {
 	fmt.Println("Generating TLS keys. This may take a minute...")
-	//	priv, err := rsa.GenerateKey(rand.Reader, 4096)
 	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return err
@@ -183,7 +181,7 @@ func createTLSCertificate(host string) error {
 	privFile := host + ".pem"
 	keyOut, err := os.OpenFile(privFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to open %s for writing: %s\n", privFile, err)
+		return fmt.Errorf("failed to open %s for writing: %v", privFile, err)
 	}
 	secp384r1, err := asn1.Marshal(asn1.ObjectIdentifier{1, 3, 132, 0, 34}) // http://www.ietf.org/rfc/rfc5480.txt
 	pem.Encode(keyOut, &pem.Block{Type: "EC PARAMETERS", Bytes: secp384r1})

@@ -17,55 +17,13 @@ import (
 )
 
 const (
-	I2P_USER_AGENT = "Wget/1.11.4"
+	i2pUserAgent = "Wget/1.11.4"
 )
 
 type Server struct {
 	*http.Server
 	Reseeder  Reseeder
 	Blacklist *Blacklist
-}
-
-func (srv *Server) ListenAndServe() error {
-	addr := srv.Addr
-	if addr == "" {
-		addr = ":http"
-	}
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-
-	return srv.Serve(newBlacklistListener(ln, srv.Blacklist))
-}
-
-func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
-	addr := srv.Addr
-	if addr == "" {
-		addr = ":https"
-	}
-	config := &tls.Config{}
-	if srv.TLSConfig != nil {
-		*config = *srv.TLSConfig
-	}
-	if config.NextProtos == nil {
-		config.NextProtos = []string{"http/1.1"}
-	}
-
-	var err error
-	config.Certificates = make([]tls.Certificate, 1)
-	config.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
-	if err != nil {
-		return err
-	}
-
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-
-	tlsListener := tls.NewListener(newBlacklistListener(ln, srv.Blacklist), config)
-	return srv.Serve(tlsListener)
 }
 
 func NewServer(prefix string, trustProxy bool) *Server {
@@ -109,7 +67,50 @@ func NewServer(prefix string, trustProxy bool) *Server {
 	return &server
 }
 
-func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
+func (srv *Server) ListenAndServe() error {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":http"
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	return srv.Serve(newBlacklistListener(ln, srv.Blacklist))
+}
+
+func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
+	addr := srv.Addr
+	if addr == "" {
+		addr = ":https"
+	}
+
+	if srv.TLSConfig == nil {
+		srv.TLSConfig = &tls.Config{}
+	}
+
+	if srv.TLSConfig.NextProtos == nil {
+		srv.TLSConfig.NextProtos = []string{"http/1.1"}
+	}
+
+	var err error
+	srv.TLSConfig.Certificates = make([]tls.Certificate, 1)
+	srv.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	tlsListener := tls.NewListener(newBlacklistListener(ln, srv.Blacklist), srv.TLSConfig)
+	return srv.Serve(tlsListener)
+}
+
+func (srv *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 	var peer Peer
 	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		peer = Peer(ip)
@@ -117,7 +118,7 @@ func (s *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {
 		peer = Peer(r.RemoteAddr)
 	}
 
-	su3Bytes, err := s.Reseeder.PeerSu3Bytes(peer)
+	su3Bytes, err := srv.Reseeder.PeerSu3Bytes(peer)
 	if nil != err {
 		http.Error(w, "500 Unable to serve su3", http.StatusInternalServerError)
 		return
@@ -144,7 +145,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func verifyMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		if I2P_USER_AGENT != r.UserAgent() {
+		if i2pUserAgent != r.UserAgent() {
 			http.Error(w, "403 Forbidden", http.StatusForbidden)
 			return
 		}

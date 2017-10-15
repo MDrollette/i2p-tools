@@ -8,9 +8,8 @@ This tool provides a secure and efficient reseed server for the I2P network. The
 If you have go installed you can download, build, and install this tool with `go get`
 
 ```
-export GOPATH=$HOME/go; mkdir $GOPATH; cd $GOPATH
-go get github.com/martin61/i2p-tools
-bin/i2p-tools -h
+go get github.com/MDrollette/i2p-tools
+i2p-tools -h
 ```
 
 ## Usage
@@ -18,13 +17,13 @@ bin/i2p-tools -h
 ### Locally behind a webserver (reverse proxy setup), preferred:
 
 ```
-GOPATH=$HOME/go; cd $GOPATH; bin/i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --port=8443 --ip=127.0.0.1 --trustProxy
+i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --port=8443 --ip=127.0.0.1 --trustProxy
 ```
 
 ### Without a webserver, standalone with TLS support
 
 ```
-GOPATH=$HOME/go; cd $GOPATH; bin/i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=your-domain.tld
+i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=your-domain.tld
 ```
 
 If this is your first time running a reseed server (ie. you don't have any existing keys), 

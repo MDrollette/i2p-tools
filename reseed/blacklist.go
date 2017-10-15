@@ -20,7 +20,7 @@ func (s *Blacklist) LoadFile(file string) error {
 	if file != "" {
 		if content, err := ioutil.ReadFile(file); err == nil {
 			for _, ip := range strings.Split(string(content), "\n") {
-				s.BlockIp(ip)
+				s.BlockIP(ip)
 			}
 		} else {
 			return err
@@ -30,7 +30,7 @@ func (s *Blacklist) LoadFile(file string) error {
 	return nil
 }
 
-func (s *Blacklist) BlockIp(ip string) {
+func (s *Blacklist) BlockIP(ip string) {
 	s.m.Lock()
 	defer s.m.Unlock()
 

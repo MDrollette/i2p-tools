@@ -97,8 +97,8 @@ func reseedAction(c *cli.Context) {
 		return
 	}
 
-	signerId := c.String("signer")
-	if signerId == "" {
+	signerID := c.String("signer")
+	if signerID == "" {
 		fmt.Println("--signer is required")
 		return
 	}
@@ -132,13 +132,13 @@ func reseedAction(c *cli.Context) {
 	}
 
 	signerKey := c.String("key")
-	// if no key is specified, default to the signerId.pem in the current dir
+	// if no key is specified, default to the signerID.pem in the current dir
 	if signerKey == "" {
-		signerKey = signerFile(signerId) + ".pem"
+		signerKey = signerFile(signerID) + ".pem"
 	}
 
 	// load our signing privKey
-	privKey, err := getOrNewSigningCert(&signerKey, signerId)
+	privKey, err := getOrNewSigningCert(&signerKey, signerID)
 	if nil != err {
 		log.Fatalln(err)
 	}
@@ -149,7 +149,7 @@ func reseedAction(c *cli.Context) {
 	// create a reseeder
 	reseeder := reseed.NewReseeder(netdb)
 	reseeder.SigningKey = privKey
-	reseeder.SignerId = []byte(signerId)
+	reseeder.SignerID = []byte(signerID)
 	reseeder.NumRi = c.Int("numRi")
 	reseeder.NumSu3 = c.Int("numSu3")
 	reseeder.RebuildInterval = reloadIntvl

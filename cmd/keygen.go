@@ -25,16 +25,16 @@ func NewKeygenCommand() cli.Command {
 }
 
 func keygenAction(c *cli.Context) {
-	signerId := c.String("signer")
+	signerID := c.String("signer")
 	tlsHost := c.String("tlsHost")
 
-	if signerId == "" && tlsHost == "" {
+	if signerID == "" && tlsHost == "" {
 		fmt.Println("You must specify either --tlsHost or --signer")
 		return
 	}
 
-	if signerId != "" {
-		if err := createSigningCertificate(signerId); nil != err {
+	if signerID != "" {
+		if err := createSigningCertificate(signerID); nil != err {
 			fmt.Println(err)
 			return
 		}

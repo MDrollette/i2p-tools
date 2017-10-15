@@ -13,65 +13,63 @@ import (
 )
 
 const (
-	MIN_VERSION_LENGTH = 16
+	minVersionLength = 16
 
-	SIGTYPE_DSA          = uint16(0)
-	SIGTYPE_ECDSA_SHA256 = uint16(1)
-	SIGTYPE_ECDSA_SHA384 = uint16(2)
-	SIGTYPE_ECDSA_SHA512 = uint16(3)
-	SIGTYPE_RSA_SHA256   = uint16(4)
-	SIGTYPE_RSA_SHA384   = uint16(5)
-	SIGTYPE_RSA_SHA512   = uint16(6)
+	SigTypeDSA             = uint16(0)
+	SigTypeECDSAWithSHA256 = uint16(1)
+	SigTypeECDSAWithSHA384 = uint16(2)
+	SigTypeECDSAWithSHA512 = uint16(3)
+	SigTypeRSAWithSHA256   = uint16(4)
+	SigTypeRSAWithSHA384   = uint16(5)
+	SigTypeRSAWithSHA512   = uint16(6)
 
-	CONTENT_TYPE_UNKNOWN = uint8(0)
-	CONTENT_TYPE_ROUTER  = uint8(1)
-	CONTENT_TYPE_PLUGIN  = uint8(2)
-	CONTENT_TYPE_RESEED  = uint8(3)
-	CONTENT_TYPE_NEWS    = uint8(4)
+	ContentTypeUnknown = uint8(0)
+	ContentTypeRouter  = uint8(1)
+	ContentTypePlugin  = uint8(2)
+	ContentTypeReseed  = uint8(3)
+	ContentTypeNews    = uint8(4)
 
-	FILE_TYPE_ZIP   = uint8(0)
-	FILE_TYPE_XML   = uint8(1)
-	FILE_TYPE_HTML  = uint8(2)
-	FILE_TYPE_XMLGZ = uint8(3)
+	FileTypeZIP   = uint8(0)
+	FileTypeXML   = uint8(1)
+	FileTypeHTML  = uint8(2)
+	FileTypeXMLGZ = uint8(3)
+
+	magicBytes = "I2Psu3"
 )
 
-var (
-	MAGIC_BYTES = []byte("I2Psu3")
-)
-
-type Su3File struct {
+type File struct {
 	Format        uint8
 	SignatureType uint16
 	FileType      uint8
 	ContentType   uint8
 
 	Version     []byte
-	SignerId    []byte
+	SignerID    []byte
 	Content     []byte
 	Signature   []byte
 	SignedBytes []byte
 }
 
-func NewSu3File() *Su3File {
-	return &Su3File{
+func New() *File {
+	return &File{
 		Version:       []byte(strconv.FormatInt(time.Now().Unix(), 10)),
-		SignatureType: SIGTYPE_RSA_SHA512,
+		SignatureType: SigTypeRSAWithSHA512,
 	}
 }
 
-func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
+func (s *File) Sign(privkey *rsa.PrivateKey) error {
 	var hashType crypto.Hash
 	switch s.SignatureType {
-	case SIGTYPE_DSA:
+	case SigTypeDSA:
 		hashType = crypto.SHA1
-	case SIGTYPE_ECDSA_SHA256, SIGTYPE_RSA_SHA256:
+	case SigTypeECDSAWithSHA256, SigTypeRSAWithSHA256:
 		hashType = crypto.SHA256
-	case SIGTYPE_ECDSA_SHA384, SIGTYPE_RSA_SHA384:
+	case SigTypeECDSAWithSHA384, SigTypeRSAWithSHA384:
 		hashType = crypto.SHA384
-	case SIGTYPE_ECDSA_SHA512, SIGTYPE_RSA_SHA512:
+	case SigTypeECDSAWithSHA512, SigTypeRSAWithSHA512:
 		hashType = crypto.SHA512
 	default:
-		return fmt.Errorf("Unknown signature type.")
+		return fmt.Errorf("unknown signature type: %d", s.SignatureType)
 	}
 
 	h := hashType.New()
@@ -88,7 +86,7 @@ func (s *Su3File) Sign(privkey *rsa.PrivateKey) error {
 	return nil
 }
 
-func (s *Su3File) BodyBytes() []byte {
+func (s *File) BodyBytes() []byte {
 	var (
 		buf = new(bytes.Buffer)
 
@@ -97,31 +95,31 @@ func (s *Su3File) BodyBytes() []byte {
 
 		versionLength   = uint8(len(s.Version))
 		signatureLength = uint16(512)
-		signerIdLength  = uint8(len(s.SignerId))
+		signerIDLength  = uint8(len(s.SignerID))
 		contentLength   = uint64(len(s.Content))
 	)
 
 	// determine sig length based on type
 	switch s.SignatureType {
-	case SIGTYPE_DSA:
+	case SigTypeDSA:
 		signatureLength = uint16(40)
-	case SIGTYPE_ECDSA_SHA256, SIGTYPE_RSA_SHA256:
+	case SigTypeECDSAWithSHA256, SigTypeRSAWithSHA256:
 		signatureLength = uint16(256)
-	case SIGTYPE_ECDSA_SHA384, SIGTYPE_RSA_SHA384:
+	case SigTypeECDSAWithSHA384, SigTypeRSAWithSHA384:
 		signatureLength = uint16(384)
-	case SIGTYPE_ECDSA_SHA512, SIGTYPE_RSA_SHA512:
+	case SigTypeECDSAWithSHA512, SigTypeRSAWithSHA512:
 		signatureLength = uint16(512)
 	}
 
 	// pad the version field
-	if len(s.Version) < MIN_VERSION_LENGTH {
-		minBytes := make([]byte, MIN_VERSION_LENGTH)
+	if len(s.Version) < minVersionLength {
+		minBytes := make([]byte, minVersionLength)
 		copy(minBytes, s.Version)
 		s.Version = minBytes
 		versionLength = uint8(len(s.Version))
 	}
 
-	binary.Write(buf, binary.BigEndian, MAGIC_BYTES)
+	binary.Write(buf, binary.BigEndian, []byte(magicBytes))
 	binary.Write(buf, binary.BigEndian, skip)
 	binary.Write(buf, binary.BigEndian, s.Format)
 	binary.Write(buf, binary.BigEndian, s.SignatureType)
@@ -129,7 +127,7 @@ func (s *Su3File) BodyBytes() []byte {
 	binary.Write(buf, binary.BigEndian, skip)
 	binary.Write(buf, binary.BigEndian, versionLength)
 	binary.Write(buf, binary.BigEndian, skip)
-	binary.Write(buf, binary.BigEndian, signerIdLength)
+	binary.Write(buf, binary.BigEndian, signerIDLength)
 	binary.Write(buf, binary.BigEndian, contentLength)
 	binary.Write(buf, binary.BigEndian, skip)
 	binary.Write(buf, binary.BigEndian, s.FileType)
@@ -137,13 +135,13 @@ func (s *Su3File) BodyBytes() []byte {
 	binary.Write(buf, binary.BigEndian, s.ContentType)
 	binary.Write(buf, binary.BigEndian, bigSkip)
 	binary.Write(buf, binary.BigEndian, s.Version)
-	binary.Write(buf, binary.BigEndian, s.SignerId)
+	binary.Write(buf, binary.BigEndian, s.SignerID)
 	binary.Write(buf, binary.BigEndian, s.Content)
 
 	return buf.Bytes()
 }
 
-func (s *Su3File) MarshalBinary() ([]byte, error) {
+func (s *File) MarshalBinary() ([]byte, error) {
 	buf := bytes.NewBuffer(s.BodyBytes())
 
 	// append the signature
@@ -152,17 +150,17 @@ func (s *Su3File) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *Su3File) UnmarshalBinary(data []byte) error {
+func (s *File) UnmarshalBinary(data []byte) error {
 	var (
 		r = bytes.NewReader(data)
 
-		magic   = MAGIC_BYTES
+		magic   = []byte(magicBytes)
 		skip    [1]byte
 		bigSkip [12]byte
 
 		signatureLength uint16
 		versionLength   uint8
-		signerIdLength  uint8
+		signerIDLength  uint8
 		contentLength   uint64
 	)
 
@@ -174,7 +172,7 @@ func (s *Su3File) UnmarshalBinary(data []byte) error {
 	binary.Read(r, binary.BigEndian, &skip)
 	binary.Read(r, binary.BigEndian, &versionLength)
 	binary.Read(r, binary.BigEndian, &skip)
-	binary.Read(r, binary.BigEndian, &signerIdLength)
+	binary.Read(r, binary.BigEndian, &signerIDLength)
 	binary.Read(r, binary.BigEndian, &contentLength)
 	binary.Read(r, binary.BigEndian, &skip)
 	binary.Read(r, binary.BigEndian, &s.FileType)
@@ -183,43 +181,43 @@ func (s *Su3File) UnmarshalBinary(data []byte) error {
 	binary.Read(r, binary.BigEndian, &bigSkip)
 
 	s.Version = make([]byte, versionLength)
-	s.SignerId = make([]byte, signerIdLength)
+	s.SignerID = make([]byte, signerIDLength)
 	s.Content = make([]byte, contentLength)
 	s.Signature = make([]byte, signatureLength)
 
 	binary.Read(r, binary.BigEndian, &s.Version)
-	binary.Read(r, binary.BigEndian, &s.SignerId)
+	binary.Read(r, binary.BigEndian, &s.SignerID)
 	binary.Read(r, binary.BigEndian, &s.Content)
 	binary.Read(r, binary.BigEndian, &s.Signature)
 
 	return nil
 }
 
-func (s *Su3File) VerifySignature(cert *x509.Certificate) error {
+func (s *File) VerifySignature(cert *x509.Certificate) error {
 	var sigAlg x509.SignatureAlgorithm
 	switch s.SignatureType {
-	case SIGTYPE_DSA:
+	case SigTypeDSA:
 		sigAlg = x509.DSAWithSHA1
-	case SIGTYPE_ECDSA_SHA256:
+	case SigTypeECDSAWithSHA256:
 		sigAlg = x509.ECDSAWithSHA256
-	case SIGTYPE_ECDSA_SHA384:
+	case SigTypeECDSAWithSHA384:
 		sigAlg = x509.ECDSAWithSHA384
-	case SIGTYPE_ECDSA_SHA512:
+	case SigTypeECDSAWithSHA512:
 		sigAlg = x509.ECDSAWithSHA512
-	case SIGTYPE_RSA_SHA256:
+	case SigTypeRSAWithSHA256:
 		sigAlg = x509.SHA256WithRSA
-	case SIGTYPE_RSA_SHA384:
+	case SigTypeRSAWithSHA384:
 		sigAlg = x509.SHA384WithRSA
-	case SIGTYPE_RSA_SHA512:
+	case SigTypeRSAWithSHA512:
 		sigAlg = x509.SHA512WithRSA
 	default:
-		return fmt.Errorf("Unknown signature type.")
+		return fmt.Errorf("unknown signature type: %d", s.SignatureType)
 	}
 
 	return checkSignature(cert, sigAlg, s.BodyBytes(), s.Signature)
 }
 
-func (s *Su3File) String() string {
+func (s *File) String() string {
 	var b bytes.Buffer
 
 	// header
@@ -229,7 +227,7 @@ func (s *Su3File) String() string {
 	fmt.Fprintf(&b, "FileType: %q\n", s.FileType)
 	fmt.Fprintf(&b, "ContentType: %q\n", s.ContentType)
 	fmt.Fprintf(&b, "Version: %q\n", bytes.Trim(s.Version, "\x00"))
-	fmt.Fprintf(&b, "SignerId: %q\n", s.SignerId)
+	fmt.Fprintf(&b, "SignerId: %q\n", s.SignerID)
 	fmt.Fprintf(&b, "---------------------------")
 
 	// content & signature

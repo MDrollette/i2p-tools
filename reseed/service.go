@@ -43,7 +43,7 @@ type ReseederImpl struct {
 	su3s  chan [][]byte
 
 	SigningKey      *rsa.PrivateKey
-	SignerId        []byte
+	SignerID        []byte
 	NumRi           int
 	RebuildInterval time.Duration
 	NumSu3          int
@@ -110,7 +110,7 @@ func (rs *ReseederImpl) rebuild() error {
 
 	// fail if we don't have enough RIs to make a single reseed file
 	if rs.NumRi > len(ris) {
-		return fmt.Errorf("Not enough routerInfos.")
+		return fmt.Errorf("not enough routerInfos - have: %d, need: %d", len(ris), rs.NumRi)
 	}
 
 	// build a pipeline ris -> seeds -> su3
@@ -179,8 +179,8 @@ func (rs *ReseederImpl) seedsProducer(ris []routerInfo) <-chan []routerInfo {
 	return out
 }
 
-func (rs *ReseederImpl) su3Builder(in <-chan []routerInfo) <-chan *su3.Su3File {
-	out := make(chan *su3.Su3File)
+func (rs *ReseederImpl) su3Builder(in <-chan []routerInfo) <-chan *su3.File {
+	out := make(chan *su3.File)
 	go func() {
 		for seeds := range in {
 			gs, err := rs.createSu3(seeds)
@@ -207,10 +207,10 @@ func (rs *ReseederImpl) PeerSu3Bytes(peer Peer) ([]byte, error) {
 	return m[peer.Hash()%len(m)], nil
 }
 
-func (rs *ReseederImpl) createSu3(seeds []routerInfo) (*su3.Su3File, error) {
-	su3File := su3.NewSu3File()
-	su3File.FileType = su3.FILE_TYPE_ZIP
-	su3File.ContentType = su3.CONTENT_TYPE_RESEED
+func (rs *ReseederImpl) createSu3(seeds []routerInfo) (*su3.File, error) {
+	su3File := su3.New()
+	su3File.FileType = su3.FileTypeZIP
+	su3File.ContentType = su3.ContentTypeReseed
 
 	zipped, err := zipSeeds(seeds)
 	if nil != err {
@@ -218,7 +218,7 @@ func (rs *ReseederImpl) createSu3(seeds []routerInfo) (*su3.Su3File, error) {
 	}
 	su3File.Content = zipped
 
-	su3File.SignerId = rs.SignerId
+	su3File.SignerID = rs.SignerID
 	su3File.Sign(rs.SigningKey)
 
 	return su3File, nil
@@ -275,8 +275,8 @@ func (db *LocalNetDbImpl) RouterInfos() (routerInfos []routerInfo, err error) {
 	return
 }
 
-func fanIn(inputs ...<-chan *su3.Su3File) <-chan *su3.Su3File {
-	out := make(chan *su3.Su3File, len(inputs))
+func fanIn(inputs ...<-chan *su3.File) <-chan *su3.File {
+	out := make(chan *su3.File, len(inputs))
 
 	var wg sync.WaitGroup
 	wg.Add(len(inputs))
@@ -288,7 +288,7 @@ func fanIn(inputs ...<-chan *su3.Su3File) <-chan *su3.Su3File {
 
 	// fan-in all the inputs to a single output
 	for _, input := range inputs {
-		go func(in <-chan *su3.Su3File) {
+		go func(in <-chan *su3.File) {
 			defer wg.Done()
 			for n := range in {
 				out <- n

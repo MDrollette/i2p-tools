@@ -76,7 +76,7 @@ func checkSignature(c *x509.Certificate, algo x509.SignatureAlgorithm, signed, s
 	return x509.ErrUnsupportedAlgorithm
 }
 
-func NewSigningCertificate(signerId string, privateKey *rsa.PrivateKey) ([]byte, error) {
+func NewSigningCertificate(signerID string, privateKey *rsa.PrivateKey) ([]byte, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -86,7 +86,7 @@ func NewSigningCertificate(signerId string, privateKey *rsa.PrivateKey) ([]byte,
 	template := &x509.Certificate{
 		BasicConstraintsValid: true,
 		IsCA:         true,
-		SubjectKeyId: []byte(signerId),
+		SubjectKeyId: []byte(signerID),
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization:       []string{"I2P Anonymous Network"},
@@ -94,7 +94,7 @@ func NewSigningCertificate(signerId string, privateKey *rsa.PrivateKey) ([]byte,
 			Locality:           []string{"XX"},
 			StreetAddress:      []string{"XX"},
 			Country:            []string{"XX"},
-			CommonName:         signerId,
+			CommonName:         signerID,
 		},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().AddDate(10, 0, 0),
