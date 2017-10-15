@@ -8,3 +8,4 @@ reseed_private.pem
 /build
 /.build
 /release/i2p-tools
+/vendor
