@@ -1,3 +1,7 @@
+2019-04-21
+ * app.Version = "0.1.7"
+ * enabling TLS 1.3 *only*
+
 2016-12-21
  * deactivating previous random time delta, makes only sense when patching ri too
  * app.Version = "0.1.6"

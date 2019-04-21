@@ -70,17 +70,23 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 
 func NewServer(prefix string, trustProxy bool) *Server {
 	config := &tls.Config{
-		MinVersion:               tls.VersionTLS10,
+//		MinVersion:               tls.VersionTLS10,
+//		PreferServerCipherSuites: true,
+//		CipherSuites: []uint16{
+//			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+//			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+//			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+//			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+//		},
+		MinVersion:               tls.VersionTLS13,
 		PreferServerCipherSuites: true,
 		CipherSuites: []uint16{
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_AES_256_GCM_SHA384,
+			tls.TLS_CHACHA20_POLY1305_SHA256,
 		},
 		CurvePreferences: []tls.CurveID{tls.CurveP384, tls.CurveP521},		// default CurveP256 removed
 	}
