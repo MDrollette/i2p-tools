@@ -85,9 +85,9 @@ func NewSigningCertificate(signerID string, privateKey *rsa.PrivateKey) ([]byte,
 
 	template := &x509.Certificate{
 		BasicConstraintsValid: true,
-		IsCA:         true,
-		SubjectKeyId: []byte(signerID),
-		SerialNumber: serialNumber,
+		IsCA:                  true,
+		SubjectKeyId:          []byte(signerID),
+		SerialNumber:          serialNumber,
 		Subject: pkix.Name{
 			Organization:       []string{"I2P Anonymous Network"},
 			OrganizationalUnit: []string{"I2P"},

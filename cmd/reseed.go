@@ -6,8 +6,10 @@ import (
 	"net"
 	"runtime"
 	"time"
+    "strconv"
 
 	"github.com/MDrollette/i2p-tools/reseed"
+    "github.com/cretz/bine/tor"
 	"github.com/codegangsta/cli"
 )
 
@@ -24,6 +26,10 @@ func NewReseedCommand() cli.Command {
 			cli.StringFlag{
 				Name:  "tlsHost",
 				Usage: "The public hostname used on your TLS certificate",
+			},
+			cli.BoolFlag{
+				Name:  "onion",
+				Usage: "Present an onionv3 address",
 			},
 			cli.StringFlag{
 				Name:  "key",
@@ -105,6 +111,7 @@ func reseedAction(c *cli.Context) {
 
 	var tlsCert, tlsKey string
 	tlsHost := c.String("tlsHost")
+
 	if tlsHost != "" {
 		tlsKey = c.String("tlsKey")
 		// if no key is specified, default to the host.pem in the current dir
@@ -179,7 +186,13 @@ func reseedAction(c *cli.Context) {
 		}()
 	}
 
-	if tlsHost != "" && tlsCert != "" && tlsKey != "" {
+    if c.Bool("onion") {
+        port, err := strconv.Atoi(c.String("port"))
+        if err != nil {
+            log.Fatalln(err.Error())
+        }
+        log.Fatalln(server.ListenAndServeOnion(nil, &tor.ListenConf{LocalPort: port, RemotePorts: []int{80}}))
+    }else if tlsHost != "" && tlsCert != "" && tlsKey != "" {
 		log.Printf("HTTPS server started on %s\n", server.Addr)
 		log.Fatalln(server.ListenAndServeTLS(tlsCert, tlsKey))
 	} else {

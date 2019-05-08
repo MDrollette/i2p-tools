@@ -2,6 +2,7 @@ package reseed
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"io"
 	"log"
@@ -9,7 +10,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/cretz/bine/tor"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
 	"gopkg.in/throttled/throttled.v2"
@@ -22,8 +25,9 @@ const (
 
 type Server struct {
 	*http.Server
-	Reseeder  Reseeder
-	Blacklist *Blacklist
+	Reseeder      Reseeder
+	Blacklist     *Blacklist
+	OnionListener *tor.OnionService
 }
 
 func NewServer(prefix string, trustProxy bool) *Server {
@@ -108,6 +112,24 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 
 	tlsListener := tls.NewListener(newBlacklistListener(ln, srv.Blacklist), srv.TLSConfig)
 	return srv.Serve(tlsListener)
+}
+
+func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor.ListenConf) error {
+	log.Println("Starting and registering onion service, please wait a couple of minutes...")
+	tor, err := tor.Start(nil, startConf)
+	if err != nil {
+		return err
+	}
+	defer tor.Close()
+
+	listenCtx, listenCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer listenCancel()
+	srv.OnionListener, err = tor.Listen(listenCtx, listenConf)
+	if err != nil {
+		return err
+	}
+	log.Printf("Onionv3 server started on http://%v.onion\n", srv.OnionListener.ID)
+	return srv.Serve(srv.OnionListener)
 }
 
 func (srv *Server) reseedHandler(w http.ResponseWriter, r *http.Request) {

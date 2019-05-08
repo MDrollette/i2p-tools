@@ -60,7 +60,7 @@ func NewTLSCertificate(host string, priv *ecdsa.PrivateKey) ([]byte, error) {
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		IsCA: true,
+		IsCA:                  true,
 	}
 
 	hosts := strings.Split(host, ",")
