@@ -2,15 +2,18 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
-    "strconv"
 
 	"github.com/MDrollette/i2p-tools/reseed"
-    "github.com/cretz/bine/tor"
 	"github.com/codegangsta/cli"
+	"github.com/cretz/bine/tor"
+	"github.com/cretz/bine/torutil/ed25519"
 )
 
 func NewReseedCommand() cli.Command {
@@ -30,6 +33,15 @@ func NewReseedCommand() cli.Command {
 			cli.BoolFlag{
 				Name:  "onion",
 				Usage: "Present an onionv3 address",
+			},
+			cli.BoolFlag{
+				Name:  "singleOnion",
+				Usage: "Use a faster, but non-anonymous single-hop onion",
+			},
+			cli.StringFlag{
+				Name:  "onionKey",
+				Value: "onion.key",
+				Usage: "Specify a path to an ed25519 private key for onion",
 			},
 			cli.StringFlag{
 				Name:  "key",
@@ -186,13 +198,49 @@ func reseedAction(c *cli.Context) {
 		}()
 	}
 
-    if c.Bool("onion") {
-        port, err := strconv.Atoi(c.String("port"))
-        if err != nil {
-            log.Fatalln(err.Error())
-        }
-        log.Fatalln(server.ListenAndServeOnion(nil, &tor.ListenConf{LocalPort: port, RemotePorts: []int{80}}))
-    }else if tlsHost != "" && tlsCert != "" && tlsKey != "" {
+	if c.Bool("onion") {
+		port, err := strconv.Atoi(c.String("port"))
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		if _, err := os.Stat(c.String("onionKey")); err == nil {
+			ok, err := ioutil.ReadFile(c.String("onionKey"))
+			if err != nil {
+				log.Fatalln(err.Error())
+			} else {
+				log.Fatalln(
+					server.ListenAndServeOnion(
+						nil,
+						&tor.ListenConf{
+							LocalPort:    port,
+							Key:          ed25519.PrivateKey(ok),
+							RemotePorts:  []int{80},
+							Version3:     true,
+							NonAnonymous: c.Bool("singleOnion"),
+							DiscardKey:   false,
+						},
+						c.String("onionKey"),
+					),
+				)
+			}
+		} else if os.IsNotExist(err) {
+			log.Fatalln(
+				server.ListenAndServeOnion(
+					nil,
+					&tor.ListenConf{
+						LocalPort:    port,
+						RemotePorts:  []int{80},
+						Version3:     true,
+						NonAnonymous: c.Bool("singleOnion"),
+						DiscardKey:   false,
+					},
+					c.String("onionKey"),
+				),
+			)
+		} else {
+
+		}
+	} else if tlsHost != "" && tlsCert != "" && tlsKey != "" {
 		log.Printf("HTTPS server started on %s\n", server.Addr)
 		log.Fatalln(server.ListenAndServeTLS(tlsCert, tlsKey))
 	} else {

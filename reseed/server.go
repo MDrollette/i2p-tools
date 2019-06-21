@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cretz/bine/tor"
+	"github.com/cretz/bine/torutil/ed25519"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
 	"gopkg.in/throttled/throttled.v2"
@@ -114,7 +116,7 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	return srv.Serve(tlsListener)
 }
 
-func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor.ListenConf) error {
+func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor.ListenConf, onionKey string) error {
 	log.Println("Starting and registering onion service, please wait a couple of minutes...")
 	tor, err := tor.Start(nil, startConf)
 	if err != nil {
@@ -125,6 +127,10 @@ func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor
 	listenCtx, listenCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer listenCancel()
 	srv.OnionListener, err = tor.Listen(listenCtx, listenConf)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(onionKey, []byte(srv.OnionListener.Key.(ed25519.KeyPair).PrivateKey()), 0644)
 	if err != nil {
 		return err
 	}
