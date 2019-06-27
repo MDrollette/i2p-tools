@@ -32,6 +32,12 @@ i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=yo
 i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --onion
 ```
 
+### Without a webserver, standalone, automatic OnionV3 with TLS support
+
+```
+i2p-tools reseed --signer=you@mail.i2p --netdb=/home/i2p/.i2p/netDb --tlsHost=your-domain.tld --onion
+```
+
 If this is your first time running a reseed server (ie. you don't have any existing keys),
 you can simply run the command and follow the prompts to create the appropriate keys, crl and certificates.
 Afterwards an HTTPS reseed server will start on the default port and generate 6 files in your current directory

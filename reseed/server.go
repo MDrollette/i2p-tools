@@ -15,10 +15,10 @@ import (
 
 	"github.com/cretz/bine/tor"
 	"github.com/cretz/bine/torutil/ed25519"
-	"github.com/throttled/throttled"
-	"github.com/throttled/throttled/store"
 	"github.com/gorilla/handlers"
 	"github.com/justinas/alice"
+	"github.com/throttled/throttled"
+	"github.com/throttled/throttled/store"
 )
 
 const (
@@ -34,18 +34,18 @@ type Server struct {
 
 func NewServer(prefix string, trustProxy bool) *Server {
 	config := &tls.Config{
-//		MinVersion:               tls.VersionTLS10,
-//		PreferServerCipherSuites: true,
-//		CipherSuites: []uint16{
-//			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-//			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-//			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-//			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-//		},
+		//		MinVersion:               tls.VersionTLS10,
+		//		PreferServerCipherSuites: true,
+		//		CipherSuites: []uint16{
+		//			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		//			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		//			tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+		//			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+		//			tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+		//			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+		//		},
 		MinVersion:               tls.VersionTLS13,
 		PreferServerCipherSuites: true,
 		CipherSuites: []uint16{
@@ -122,8 +122,50 @@ func (srv *Server) ListenAndServeTLS(certFile, keyFile string) error {
 	return srv.Serve(tlsListener)
 }
 
+func (srv *Server) ListenAndServeOnionTLS(startConf *tor.StartConf, listenConf *tor.ListenConf, certFile, keyFile, onionKey string) error {
+	log.Println("Starting and registering OnionV3 HTTPS service, please wait a couple of minutes...")
+	tor, err := tor.Start(nil, startConf)
+	if err != nil {
+		return err
+	}
+	defer tor.Close()
+
+	listenCtx, listenCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer listenCancel()
+
+	if srv.TLSConfig == nil {
+		srv.TLSConfig = &tls.Config{}
+	}
+
+	if srv.TLSConfig.NextProtos == nil {
+		srv.TLSConfig.NextProtos = []string{"http/1.1"}
+	}
+    srv.OnionListener, err = tor.Listen(listenCtx, listenConf)
+	if err != nil {
+		return err
+	}
+    srv.Addr = srv.OnionListener.ID
+
+	//	var err error
+	srv.TLSConfig.Certificates = make([]tls.Certificate, 1)
+	srv.TLSConfig.Certificates[0], err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(onionKey, []byte(srv.OnionListener.Key.(ed25519.KeyPair).PrivateKey()), 0644)
+	if err != nil {
+		return err
+	}
+	log.Printf("Onionv3 server started on https://%v.onion\n", srv.OnionListener.ID)
+
+	tlsListener := tls.NewListener(srv.OnionListener, srv.TLSConfig)
+
+	return srv.Serve(tlsListener)
+}
+
 func (srv *Server) ListenAndServeOnion(startConf *tor.StartConf, listenConf *tor.ListenConf, onionKey string) error {
-	log.Println("Starting and registering onion service, please wait a couple of minutes...")
+	log.Println("Starting and registering OnionV3 service, please wait a couple of minutes...")
 	tor, err := tor.Start(nil, startConf)
 	if err != nil {
 		return err
